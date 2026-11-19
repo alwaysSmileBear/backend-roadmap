@@ -1,0 +1,846 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2. 네트워크 — 백엔드 기본기</title>
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("roadmap:theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body data-chapter="network">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text)"/></marker>
+<marker id="arra" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+<marker id="arrm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--muted)"/></marker>
+<marker id="arrw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--warn)"/></marker>
+<marker id="arrg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--done)"/></marker>
+</defs></svg><div class="layout">
+  <nav class="side">
+    <a class="home" href="index.html">← 로드맵 홈</a>
+    <h1>2. 네트워크</h1>
+    <p class="sub">1%의 네트워크 원리 + HTTP 완벽 가이드 · 3~4주</p>
+    <div class="progress">
+      진행률 <b id="pct">0%</b>
+      <div class="bar"><span id="bar"></span></div>
+      <div class="tools">
+        <button data-act="open">답 모두 열기</button>
+        <button data-act="close">답 모두 닫기</button>
+        <button data-act="reset">초기화</button>
+        <button class="theme-btn" type="button">테마: 시스템</button>
+      </div>
+    </div>
+    <ol id="toc"></ol>
+  </nav>
+
+  <main>
+    <header class="chap-head">
+      <h1>네트워크</h1>
+      <p class="meta">기준 교재: 성공과 실패를 결정하는 1%의 네트워크 원리 (Tsutomu Tone) + HTTP 완벽 가이드 · 3~4주</p>
+      <p>『1%의 네트워크 원리』는 "브라우저에 URL을 입력하면 무슨 일이 일어나는가"를 <b>브라우저 → 프로토콜 스택 → LAN → 인터넷 → 서버 측 → 웹 서버</b> 순서로 패킷을 따라가며 설명해요. 이 페이지는 그 6장 구성을 따르고, HTTP 자체는 『HTTP 완벽 가이드』에서 필요한 장만 부록으로 붙였어요.</p>
+      <p>백엔드 개발자에게 특히 중요한 장은 <b>1장(DNS), 2장(TCP 전체), 5장(LB·프록시), 6장(서버 소켓), 부록 B(연결 관리), C(캐시)</b>예요.</p>
+      <div class="books">
+        <div class="book"><b>성공과 실패를 결정하는 1%의 네트워크 원리 <span class="tag must">기준 교재</span></b><span>패킷의 여정을 따라가는 구성, 입문자에게 최적</span></div>
+        <div class="book"><b>HTTP 완벽 가이드</b><span>1~4장, 7장(캐시), 11장(쿠키), 14장(보안) 위주</span></div>
+        <div class="book"><b>TCP/IP Illustrated Vol.1 <span class="tag deep">심화</span></b><span>TCP를 바닥까지 알고 싶을 때</span></div>
+      </div>
+    </header>
+
+    <!-- ================================================================ -->
+    <div class="part-title">1장 웹 브라우저가 메시지를 만든다</div>
+
+    <section id="s1-1" data-sec>
+      <h2>1.1 URL 해석과 HTTP 요청 메시지</h2>
+      <p class="lead">브라우저가 가장 먼저 하는 일</p>
+
+      <h3>URL 분해</h3>
+<pre><code>https://api.example.com:443/users/42?fields=name#top
+└─┬─┘   └──────┬───────┘└┬┘└───┬───┘└────┬─────┘└┬┘
+스킴        호스트        포트   경로      쿼리     프래그먼트</code></pre>
+      <p>브라우저는 스킴으로 프로토콜을 정하고, 호스트로 어느 서버인지, 경로와 쿼리로 무엇을 요청할지 정해요. 프래그먼트는 서버로 보내지 않아요.</p>
+
+      <h3>HTTP 요청 메시지</h3>
+<pre><code>GET /users/42?fields=name HTTP/1.1      ← 요청 라인: 메서드 URI 버전
+Host: api.example.com                   ← 헤더 (이름: 값)
+Accept: application/json
+Authorization: Bearer eyJ...
+                                        ← 빈 줄
+(본문: GET은 보통 없음)</code></pre>
+      <p>응답도 같은 구조예요: 상태 라인(<code>HTTP/1.1 200 OK</code>) + 헤더 + 빈 줄 + 본문. HTTP는 <b>텍스트 기반, 상태 없음(stateless)</b>이에요. 요청 하나하나가 독립이고, 서버는 이전 요청을 기억하지 않아요. 그래서 상태가 필요하면 쿠키나 토큰으로 매번 알려줘야 해요.</p>
+
+      <h3>메서드</h3>
+      <div class="tbl"><table>
+        <tr><th>메서드</th><th>의미</th><th>안전</th><th>멱등</th></tr>
+        <tr><td>GET</td><td>리소스 조회</td><td>O</td><td>O</td></tr>
+        <tr><td>HEAD</td><td>GET과 같지만 본문 없이 헤더만</td><td>O</td><td>O</td></tr>
+        <tr><td>POST</td><td>리소스 생성, 처리 요청</td><td>X</td><td>X</td></tr>
+        <tr><td>PUT</td><td>리소스 전체 교체</td><td>X</td><td>O</td></tr>
+        <tr><td>PATCH</td><td>리소스 일부 수정</td><td>X</td><td>구현에 따라</td></tr>
+        <tr><td>DELETE</td><td>리소스 삭제</td><td>X</td><td>O</td></tr>
+        <tr><td>OPTIONS</td><td>지원 메서드 확인 (CORS preflight)</td><td>O</td><td>O</td></tr>
+      </table></div>
+      <p><b>안전</b> = 서버 상태를 바꾸지 않음. <b>멱등</b> = 여러 번 해도 한 번과 결과가 같음. 브라우저와 프록시는 이 성질을 믿고 GET을 캐시하고, 멱등한 요청만 자동 재시도해요.</p>
+
+      <div class="backend"><b>백엔드에서는</b> 조회를 POST로 만들면 캐시와 재시도의 이점을 전부 잃어요. 반대로 상태를 바꾸는 작업을 GET으로 만들면 크롤러나 프리페치가 실행해 버려요. API 설계 시 메서드의 안전·멱등 성질을 지키는 게 HTTP 인프라(CDN, 프록시, 클라이언트 라이브러리)를 공짜로 쓰는 길이에요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>URL = 스킴 + 호스트 + 포트 + 경로 + 쿼리</li><li>HTTP 메시지 = 시작 라인 + 헤더 + 빈 줄 + 본문, 상태 없음</li><li>안전·멱등은 캐시와 재시도의 근거</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>DELETE가 멱등인 이유는? 두 번째 DELETE는 404를 돌려주는데도?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p>멱등은 "서버 상태"가 같다는 뜻이지 "응답"이 같다는 뜻이 아니에요. 한 번 지우든 두 번 지우든 리소스는 없는 상태로 같아요. 응답 코드가 200 → 404로 달라져도 멱등이에요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <section id="s1-2" data-sec>
+      <h2>1.2~1.3 DNS — 이름을 IP로</h2>
+      <p class="lead">리졸버와 DNS 서버의 계층 구조</p>
+
+      <h3>리졸버</h3>
+      <p>브라우저가 <code>api.example.com</code>의 IP를 알아내려면 OS의 <b>리졸버</b>(<code>getaddrinfo</code> 같은 라이브러리 함수)를 불러요. 리졸버는 먼저 로컬 캐시와 <code>/etc/hosts</code>를 보고, 없으면 설정된 DNS 서버(<code>/etc/resolv.conf</code>, 보통 ISP나 8.8.8.8)에 UDP 53번으로 질의해요.</p>
+
+      <h3>DNS 서버의 계층</h3>
+      <p>전 세계 도메인을 한 서버가 다 알 수 없으니 <b>계층적으로 위임</b>해요.</p>
+      <figure class="diagram">
+        <svg viewBox="0 0 640 235" role="img" aria-label="DNS 조회 흐름">
+          <rect x="15" y="95" width="120" height="44" rx="6" class="dg-box"/><text x="75" y="113" text-anchor="middle" class="dg-t">브라우저</text><text x="75" y="128" text-anchor="middle" class="dg-tm">OS 리졸버</text>
+          <rect x="190" y="25" width="140" height="190" rx="8" class="dg-acc"/><text x="260" y="112" text-anchor="middle" class="dg-tb">재귀 DNS 서버</text><text x="260" y="128" text-anchor="middle" class="dg-tm">(캐시, TTL)</text>
+          <rect x="440" y="18" width="185" height="36" rx="6" class="dg-box"/><text x="532" y="40" text-anchor="middle" class="dg-t">루트 서버</text>
+          <rect x="440" y="99" width="185" height="36" rx="6" class="dg-box"/><text x="532" y="121" text-anchor="middle" class="dg-t">.com TLD 서버</text>
+          <rect x="440" y="180" width="185" height="36" rx="6" class="dg-box"/><text x="532" y="202" text-anchor="middle" class="dg-t">example.com 권한 서버</text>
+          <path d="M135 110 L188 110" class="dg-l"/><text x="160" y="100" text-anchor="middle" class="dg-tm">질의</text>
+          <path d="M330 36 L438 36" class="dg-l"/><text x="384" y="28" text-anchor="middle" class="dg-tm">① .com 서버는?</text>
+          <path d="M330 117 L438 117" class="dg-l"/><text x="384" y="109" text-anchor="middle" class="dg-tm">② example.com 서버는?</text>
+          <path d="M330 198 L438 198" class="dg-l"/><text x="384" y="190" text-anchor="middle" class="dg-tm">③ api의 IP는?</text>
+          <path d="M188 128 L135 128" class="dg-lg"/><text x="160" y="150" text-anchor="middle" class="dg-tg">④ IP + TTL</text>
+        </svg>
+        <figcaption>재귀 서버가 ①②③을 대신 하고 결과를 TTL 동안 캐시. 두 번째 질의부터는 ④만 일어난다.</figcaption>
+      </figure>
+      <p>재귀 서버가 이 과정을 대신 하고 결과를 <b>TTL</b> 동안 캐시해요. 두 번째 질의부터는 바로 응답해요.</p>
+
+      <h3>레코드 종류</h3>
+      <ul>
+        <li><b>A / AAAA</b>: 이름 → IPv4 / IPv6</li>
+        <li><b>CNAME</b>: 이름 → 다른 이름 (별칭). <code>www.example.com → example.cdn.net</code></li>
+        <li><b>MX</b>: 메일 서버</li>
+        <li><b>NS</b>: 이 도메인의 권한 서버</li>
+        <li><b>TXT</b>: 임의 텍스트 (도메인 소유 확인, SPF)</li>
+      </ul>
+
+      <h3>TTL과 전파</h3>
+      <p>DNS를 바꿔도 캐시가 만료될 때까지 옛 IP로 가요. 그래서 이전 작업 전에 TTL을 미리 낮춰요(300초 → 60초). "DNS 전파에 48시간"이라는 말은 TTL이 길거나 중간 캐시 서버가 TTL을 무시하는 경우예요.</p>
+
+      <div class="backend"><b>백엔드에서는</b> JVM은 DNS 결과를 자체 캐시해요. 기본은 보안 관리자 없으면 30초지만 옛 버전은 <b>영구 캐시</b>였어요(<code>networkaddress.cache.ttl</code>). 로드밸런서 IP가 바뀌었는데 옛 IP로 계속 가서 장애가 나는 전형적 사고예요. 쿠버네티스 안에서는 CoreDNS가 <code>my-svc.my-ns.svc.cluster.local</code>을 서비스 IP로 풀어주고, <code>ndots:5</code> 설정 때문에 외부 도메인 조회가 5번 실패 후 성공하는 지연 문제가 있어요. DNS 조회 실패나 느림은 "외부 API가 느리다"로 보여서 찾기 어려워요. <code>dig +trace</code>, <code>nslookup</code>으로 직접 확인하세요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>리졸버 → 재귀 서버 → 루트 → TLD → 권한 서버</li><li>TTL 동안 캐시, 바꾸기 전엔 TTL 낮추기</li><li>애플리케이션 런타임도 캐시함(JVM) → 장애 원인</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>DNS는 왜 UDP를 쓰나요? TCP를 쓰는 경우는?</li><li>CNAME과 A 레코드의 차이는?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p><b>1.</b> 질의/응답이 작은 패킷 하나로 끝나서 TCP 연결 수립(1 RTT)이 아까워요. 응답이 512바이트(EDNS면 더 큼)를 넘거나 존 전송(AXFR)일 때 TCP를 써요. DoT/DoH는 TCP/HTTPS 위예요.</p>
+          <p><b>2.</b> A는 이름을 IP로 직접 매핑. CNAME은 이름을 다른 이름으로 매핑해서 한 번 더 조회가 필요해요. 대신 대상 IP가 바뀌어도 CNAME은 안 바꿔도 돼요(CDN, LB 도메인에 사용). 루트 도메인(apex)에는 CNAME을 못 둬요(ALIAS 레코드로 대체).</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <section id="s1-4" data-sec>
+      <h2>1.4 프로토콜 스택에 송신을 의뢰한다 — 소켓</h2>
+      <p class="lead">브라우저는 직접 패킷을 보내지 않는다. OS에게 부탁한다</p>
+
+      <h3>프로토콜 스택</h3>
+      <p>네트워크 통신 기능은 OS 안에 있어요(TCP, IP, 드라이버). 애플리케이션은 <b>소켓 API</b>로 OS에 의뢰만 해요. 그래서 모든 언어의 HTTP 클라이언트는 결국 같은 시스템 콜을 불러요.</p>
+
+      <h3>소켓 라이브러리 호출 순서 (클라이언트)</h3>
+      <ol>
+        <li><code>socket()</code>: 소켓 생성. fd를 돌려받아요. OS 안에 제어 정보(상태, 상대 IP·포트, 버퍼)를 담을 공간이 생겨요.</li>
+        <li><code>connect(fd, 서버IP, 포트)</code>: 서버와 연결. 3-way handshake가 여기서 일어나요.</li>
+        <li><code>write(fd, 요청)</code> / <code>read(fd, 버퍼)</code>: 데이터 송수신. HTTP 메시지는 그냥 바이트예요.</li>
+        <li><code>close(fd)</code>: 연결 종료. 4-way handshake.</li>
+      </ol>
+      <p>이 4단계가 전부예요. HTTP 라이브러리가 하는 일은 메시지를 문자열로 만들어 write하고, read한 바이트를 파싱하는 것이에요.</p>
+
+      <h3>포트</h3>
+      <p>IP는 머신을, <b>포트</b>는 머신 안의 프로그램(소켓)을 가리켜요. 서버는 잘 알려진 포트(80, 443, 3306)로 기다리고, 클라이언트는 OS가 주는 임시 포트(ephemeral, 리눅스 기본 32768~60999)를 써요. 연결은 <b>(출발 IP, 출발 포트, 목적 IP, 목적 포트)</b> 4-tuple로 식별돼요.</p>
+
+      <div class="backend"><b>백엔드에서는</b> 클라이언트 임시 포트는 약 28,000개뿐이에요. 같은 목적지(IP:포트)로 연결을 계속 새로 맺고 끊으면(keep-alive 없이) TIME_WAIT가 쌓여 포트가 고갈돼요. "Cannot assign requested address" 에러가 그거예요. 커넥션 풀을 쓰거나 <code>net.ipv4.ip_local_port_range</code>를 넓혀요. 또 <code>ulimit -n</code>이 소켓 fd 수를 제한하니 서버에서는 반드시 올려야 해요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>통신은 OS가 함, 앱은 socket/connect/write/read/close만</li><li>연결 식별 = 4-tuple, 클라이언트 포트는 유한</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>한 클라이언트가 같은 서버 포트로 동시에 여러 연결을 맺을 수 있는 이유는?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p>연결은 4-tuple로 구분되는데 클라이언트 출발 포트가 연결마다 달라요. (10.0.0.1:50001 → 서버:443)과 (10.0.0.1:50002 → 서버:443)은 다른 연결이에요. 서버 쪽은 443 하나로 수만 개 연결을 받아요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <!-- ================================================================ -->
+    <div class="part-title">2장 TCP/IP의 데이터를 전기 신호로</div>
+
+    <section id="s2-1" data-sec>
+      <h2>2.1~2.2 소켓 작성과 접속 — 3-way handshake</h2>
+      <p class="lead">connect() 안에서 일어나는 일</p>
+
+      <h3>TCP 헤더</h3>
+      <p>TCP는 데이터 앞에 20바이트 이상의 헤더를 붙여요. 중요한 필드: 출발/목적 포트, <b>시퀀스 번호</b>(이 세그먼트의 첫 바이트 번호), <b>ACK 번호</b>(다음에 받고 싶은 바이트 번호), 제어 비트(SYN, ACK, FIN, RST, PSH), <b>윈도우 크기</b>(내가 받을 수 있는 양).</p>
+
+      <h3>3-way handshake</h3>
+      <figure class="diagram">
+        <svg viewBox="0 0 580 195" role="img" aria-label="TCP 3-way handshake">
+          <text x="110" y="22" text-anchor="middle" class="dg-tb">Client</text><text x="440" y="22" text-anchor="middle" class="dg-tb">Server</text>
+          <line x1="110" y1="30" x2="110" y2="185" class="dg-sep"/><line x1="440" y1="30" x2="440" y2="185" class="dg-sep"/>
+          <text x="450" y="45" class="dg-tm">LISTEN</text>
+          <path d="M110 60 L438 60" class="dg-la"/><text x="275" y="53" text-anchor="middle" class="dg-t">SYN, seq=x</text><text x="100" y="64" text-anchor="end" class="dg-tm">SYN_SENT</text>
+          <path d="M440 105 L112 105" class="dg-la"/><text x="275" y="98" text-anchor="middle" class="dg-t">SYN+ACK, seq=y, ack=x+1</text><text x="450" y="109" class="dg-tm">SYN_RCVD</text>
+          <path d="M110 150 L438 150" class="dg-la"/><text x="275" y="143" text-anchor="middle" class="dg-t">ACK, ack=y+1</text><text x="100" y="154" text-anchor="end" class="dg-tg">ESTABLISHED</text><text x="450" y="172" class="dg-tg">ESTABLISHED</text>
+          <path d="M520 60 L520 150" class="dg-plain" style="stroke:var(--muted)"/><line x1="515" y1="60" x2="525" y2="60" class="dg-plain" style="stroke:var(--muted)"/><line x1="515" y1="150" x2="525" y2="150" class="dg-plain" style="stroke:var(--muted)"/><text x="528" y="109" class="dg-tm">1 RTT</text>
+        </svg>
+        <figcaption>3-way handshake. 양쪽 모두 상대의 초기 시퀀스 번호를 확인해야 연결 완료.</figcaption>
+      </figure>
+      <p>왜 3번? 양쪽 모두 "내가 보낼 수 있고, 상대가 받을 수 있다"를 확인해야 해서예요. 2번이면 서버는 자기 SYN이 도착했는지 몰라요. 초기 시퀀스 번호를 랜덤으로 하는 건 옛 연결의 패킷과 섞이는 걸 막고 추측 공격을 어렵게 하려는 거예요.</p>
+
+      <h3>서버 쪽: backlog</h3>
+      <p>서버는 <code>listen(fd, backlog)</code>로 대기해요. SYN을 받은 연결(SYN 큐)과 handshake가 끝나 <code>accept()</code>를 기다리는 연결(accept 큐) 두 큐가 있어요. 애플리케이션이 accept를 못 따라가면 accept 큐가 넘쳐 SYN+ACK를 안 보내거나 연결을 버려요. 클라이언트는 타임아웃으로 봐요.</p>
+
+      <h3>SYN flood</h3>
+      <p>SYN만 보내고 ACK를 안 보내면 SYN 큐가 차요. 방어는 <b>SYN cookie</b>: 큐에 저장하지 않고 시퀀스 번호에 정보를 인코딩해서 ACK가 오면 복원해요.</p>
+
+      <div class="backend"><b>백엔드에서는</b> 트래픽 급증 때 "연결은 됐는데 응답이 없다"와 "연결 자체가 안 된다"를 구분해야 해요. 후자는 accept 큐 overflow일 수 있어요. <code>ss -ltn</code>의 Recv-Q(현재 큐)와 Send-Q(backlog 한도), <code>netstat -s | grep -i listen</code>의 overflow 카운트로 확인해요. 톰캣 <code>acceptCount</code>, Nginx <code>backlog</code>, 커널 <code>net.core.somaxconn</code>이 이 크기예요. 셋 중 가장 작은 값이 적용돼요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>SYN → SYN+ACK → ACK, 1 RTT, 시퀀스 번호 교환</li><li>서버 backlog = SYN 큐 + accept 큐, 넘치면 연결 실패</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>handshake가 2-way면 안 되는 이유는?</li><li>accept 큐가 꽉 차면 클라이언트는 어떤 현상을 보나요?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p><b>1.</b> 서버가 보낸 SYN+ACK가 클라이언트에 도착했는지 서버가 알 수 없어요. 양방향 모두의 도달성과 초기 번호를 확인하려면 마지막 ACK가 필요해요.</p>
+          <p><b>2.</b> 리눅스 기본은 마지막 ACK를 버려요. 클라이언트는 ESTABLISHED라고 믿고 데이터를 보내지만 응답이 없고, 재전송 후 결국 타임아웃. 서버 로그엔 아무것도 안 남아서 찾기 어려워요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <section id="s2-3" data-sec>
+      <h2>2.3 데이터 송수신 — 신뢰성, 흐름 제어, 혼잡 제어</h2>
+      <p class="lead">TCP가 "확실히, 순서대로, 너무 빠르지 않게" 보내는 방법</p>
+
+      <h3>세그먼트와 MSS</h3>
+      <p>애플리케이션이 write한 데이터는 송신 버퍼에 쌓이고, TCP가 <b>MSS</b>(최대 세그먼트 크기, 이더넷에서 보통 1460바이트) 단위로 잘라 보내요. 작은 데이터를 바로 보낼지 모아서 보낼지는 <b>Nagle 알고리즘</b>이 정해요. 지연이 중요하면 <code>TCP_NODELAY</code>로 꺼요.</p>
+
+      <h3>신뢰성: 시퀀스 번호와 ACK</h3>
+      <p>모든 바이트에 번호가 있고, 수신자는 "여기까지 받았다"를 ACK 번호로 알려요. 송신자는 ACK가 일정 시간(RTO, RTT 기반으로 계산) 안에 안 오면 재전송해요. 같은 ACK가 3번 연속 오면(dup ACK) 타임아웃 전에 바로 재전송해요(fast retransmit). 순서가 바뀌어 도착한 세그먼트는 수신 버퍼에서 정렬해요.</p>
+
+      <h3>흐름 제어: 수신 윈도우</h3>
+      <p>수신자가 버퍼에서 데이터를 꺼내는 속도보다 빨리 보내면 넘쳐요. 그래서 수신자는 ACK마다 <b>윈도우 크기</b>(남은 버퍼)를 알려주고, 송신자는 ACK 없이 그만큼만 보내요. 윈도우가 0이면 멈춰요. 애플리케이션이 <code>read()</code>를 안 하면 윈도우가 0이 되고 송신자가 블록돼요. 이게 <b>backpressure</b>가 TCP 레벨에서 자연스럽게 작동하는 원리예요.</p>
+
+      <h3>혼잡 제어: 혼잡 윈도우</h3>
+      <p>수신자는 여유 있어도 중간 라우터가 넘칠 수 있어요. 송신자는 네트워크 상태를 추측해 <b>혼잡 윈도우(cwnd)</b>를 관리하고, 실제 전송량은 <code>min(수신 윈도우, cwnd)</code>예요.</p>
+      <ul>
+        <li><b>Slow start</b>: cwnd를 1 MSS에서 시작해 RTT마다 2배로 (지수 증가)</li>
+        <li><b>Congestion avoidance</b>: 임계값(ssthresh) 넘으면 RTT마다 1 MSS씩 (선형 증가)</li>
+        <li><b>손실 감지</b>: 타임아웃이면 cwnd를 1로 리셋(심각), dup ACK 3번이면 절반으로(가벼움)</li>
+      </ul>
+      <p>리눅스 기본 알고리즘은 <b>CUBIC</b>(손실 기반)이고, Google의 <b>BBR</b>은 손실 대신 대역폭과 RTT를 측정해 결정해요. 손실이 있는 무선망에서 BBR이 훨씬 좋아요.</p>
+
+      <h3>지연의 원인</h3>
+      <p>1 RTT가 100ms인 대륙 간 통신에서 slow start 때문에 처음 몇 RTT는 윈도우가 작아요. 작은 파일 하나도 수백 ms가 걸려요. 그래서 연결을 재사용(keep-alive)하면 이미 커진 cwnd를 이어 쓸 수 있어 빨라요. 초기 cwnd를 10 MSS로 올린 것(RFC 6928)도 이 때문이에요.</p>
+
+      <div class="backend"><b>백엔드에서는</b> 큰 응답(수 MB JSON, 파일 다운로드)이 느린 건 대역폭보다 RTT × 윈도우 성장 때문인 경우가 많아요. 압축(gzip, brotli)으로 바이트를 줄이는 게 효과적이에요. 그리고 수신 윈도우 0 = 상대 애플리케이션이 안 읽고 있다는 뜻이에요. 서버가 응답을 느리게 보내는 줄 알았는데 클라이언트가 처리를 못 하는 경우를 Wireshark의 "TCP ZeroWindow"로 잡아요. 스트리밍 응답에서 클라이언트가 느리면 서버 스레드가 write에서 블록되는 이유이기도 해요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>신뢰성 = 시퀀스 번호 + ACK + 재전송</li><li>흐름 제어 = 수신 윈도우(수신자 보호), 혼잡 제어 = cwnd(네트워크 보호)</li><li>slow start 때문에 새 연결은 느림 → keep-alive</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>흐름 제어와 혼잡 제어는 누구를 보호하나요?</li><li>같은 대역폭인데 RTT가 10배 길면 처리량이 어떻게 되나요?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p><b>1.</b> 흐름 제어는 수신자의 버퍼(수신자가 윈도우로 알려줌), 혼잡 제어는 중간 네트워크(송신자가 손실·지연으로 추정).</p>
+          <p><b>2.</b> 처리량 ≈ 윈도우 / RTT. 윈도우가 같으면 RTT가 10배 길 때 처리량은 1/10이에요. 그래서 장거리 통신은 윈도우를 키워야 하고(window scaling), slow start 단계도 10배 오래 걸려요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <section id="s2-4" data-sec>
+      <h2>2.4 연결 끊기 — 4-way handshake와 TIME_WAIT</h2>
+      <p class="lead">close() 안에서 일어나는 일, 그리고 서버에 쌓이는 상태들</p>
+
+      <h3>4-way handshake</h3>
+      <figure class="diagram">
+        <svg viewBox="0 0 600 250" role="img" aria-label="TCP 4-way handshake">
+          <text x="130" y="22" text-anchor="middle" class="dg-tb">Client (먼저 close)</text><text x="440" y="22" text-anchor="middle" class="dg-tb">Server</text>
+          <line x1="130" y1="30" x2="130" y2="240" class="dg-sep"/><line x1="440" y1="30" x2="440" y2="240" class="dg-sep"/>
+          <path d="M130 55 L438 55" class="dg-la"/><text x="285" y="48" text-anchor="middle" class="dg-t">FIN</text><text x="120" y="59" text-anchor="end" class="dg-tm">FIN_WAIT_1</text><text x="450" y="59" class="dg-tw">CLOSE_WAIT</text><text x="450" y="73" class="dg-tm">앱이 close() 할 때까지 유지</text>
+          <path d="M440 90 L132 90" class="dg-la"/><text x="285" y="83" text-anchor="middle" class="dg-t">ACK</text><text x="120" y="94" text-anchor="end" class="dg-tm">FIN_WAIT_2</text>
+          <text x="450" y="120" class="dg-tm">서버 앱 close() 호출</text>
+          <path d="M440 140 L132 140" class="dg-la"/><text x="285" y="133" text-anchor="middle" class="dg-t">FIN</text><text x="450" y="144" class="dg-tm">LAST_ACK</text>
+          <path d="M130 175 L438 175" class="dg-la"/><text x="285" y="168" text-anchor="middle" class="dg-t">ACK</text><text x="120" y="179" text-anchor="end" class="dg-ta">TIME_WAIT (2MSL)</text><text x="450" y="179" class="dg-tg">CLOSED</text>
+          <text x="120" y="212" text-anchor="end" class="dg-tm">… 60초 후 …</text><text x="120" y="232" text-anchor="end" class="dg-tg">CLOSED</text>
+        </svg>
+        <figcaption>각 방향을 따로 닫는다. TIME_WAIT는 먼저 닫은 쪽에, CLOSE_WAIT는 close()를 안 한 쪽에 남는다.</figcaption>
+      </figure>
+      <p>TCP는 양방향이 독립적이라 각 방향을 따로 닫아요. 한쪽이 FIN을 보내도 반대 방향은 열려 있어 데이터를 계속 받을 수 있어요(half-close).</p>
+
+      <h3>TIME_WAIT</h3>
+      <p><b>먼저 닫은 쪽</b>이 마지막 ACK 후 2MSL(리눅스 60초) 동안 유지하는 상태예요. 이유: (1) 마지막 ACK가 유실되면 상대가 FIN을 재전송하니 다시 ACK해 줘야 함, (2) 네트워크에 떠도는 옛 패킷이 같은 4-tuple의 새 연결에 섞이는 걸 막음. 정상이에요. 문제는 <b>너무 많을 때</b>예요. 포트와 메모리를 차지해요.</p>
+      <p>해결: 연결을 재사용(keep-alive, 커넥션 풀)해서 close 횟수 자체를 줄여요. <code>net.ipv4.tcp_tw_reuse=1</code>로 클라이언트 쪽 TIME_WAIT 소켓을 재사용할 수 있어요.</p>
+
+      <h3>CLOSE_WAIT</h3>
+      <p>상대의 FIN을 받고 ACK는 보냈는데, <b>우리 애플리케이션이 close()를 안 한</b> 상태예요. OS는 앱이 close할 때까지 기다려요. 쌓인다면 100% 우리 코드의 소켓 누수예요.</p>
+
+      <h3>RST</h3>
+      <p>정상 종료가 아닌 강제 리셋. 닫힌 포트로 데이터가 오거나, 애플리케이션이 데이터가 남은 소켓을 close하거나, 방화벽이 끊을 때 보내요. 받은 쪽은 "Connection reset by peer"예요.</p>
+
+      <div class="backend"><b>백엔드에서는</b> 서버의 <code>ss -tan | awk '{print $1}' | sort | uniq -c</code>로 상태 분포를 봐요. TIME_WAIT가 수만 개면 짧은 연결을 너무 많이 만드는 것(HTTP 클라이언트에 keep-alive 안 씀, DB 커넥션 풀 없음), CLOSE_WAIT가 쌓이면 응답 스트림을 안 닫는 코드(HttpClient 응답 body를 소비하지 않음, try-with-resources 누락). "Connection reset"이 간헐적으로 나면 LB idle timeout과 keep-alive timeout 불일치를 의심하세요(5장).</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>FIN/ACK × 2, 각 방향 독립 종료</li><li>TIME_WAIT = 먼저 닫은 쪽, 정상, 많으면 연결 재사용으로 해결</li><li>CLOSE_WAIT = 우리 앱의 close 누락</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>서버에서 TIME_WAIT가 많다면 누가 연결을 먼저 닫고 있는 건가요? 그게 좋은가요?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p>TIME_WAIT는 먼저 close한 쪽에 생기니, 서버가 먼저 닫고 있어요. HTTP 서버가 응답 후 연결을 닫는(<code>Connection: close</code>) 설정이거나 keep-alive timeout이 짧아서예요. 서버가 TIME_WAIT를 떠안으면 포트는 괜찮지만(서버 포트는 고정) 메모리와 소켓 테이블을 차지해요. 가능하면 클라이언트가 먼저 닫거나, keep-alive로 연결 수 자체를 줄이는 게 좋아요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <section id="s2-5" data-sec>
+      <h2>2.5 IP와 이더넷 — 패킷 송신</h2>
+      <p class="lead">TCP 세그먼트가 IP 패킷이 되고 이더넷 프레임이 되어 케이블로</p>
+
+      <h3>IP 헤더와 캡슐화</h3>
+      <p>TCP 세그먼트 앞에 IP 헤더(출발/목적 IP, TTL, 프로토콜 번호, 체크섬)를 붙여 <b>IP 패킷</b>을 만들고, 그 앞에 이더넷 헤더(출발/목적 MAC)를 붙여 <b>프레임</b>을 만들어요. 각 계층은 아래 계층의 데이터일 뿐이에요.</p>
+      <figure class="diagram">
+        <svg viewBox="0 0 640 150" role="img" aria-label="패킷 캡슐화">
+          <rect x="20" y="20" width="110" height="44" class="dg-box"/><text x="75" y="38" text-anchor="middle" class="dg-t">이더넷 헤더</text><text x="75" y="54" text-anchor="middle" class="dg-tm">MAC 주소</text>
+          <rect x="130" y="20" width="110" height="44" class="dg-box"/><text x="185" y="38" text-anchor="middle" class="dg-t">IP 헤더</text><text x="185" y="54" text-anchor="middle" class="dg-tm">IP 주소, TTL</text>
+          <rect x="240" y="20" width="110" height="44" class="dg-box"/><text x="295" y="38" text-anchor="middle" class="dg-t">TCP 헤더</text><text x="295" y="54" text-anchor="middle" class="dg-tm">포트, seq/ack</text>
+          <rect x="350" y="20" width="270" height="44" class="dg-acc"/><text x="485" y="38" text-anchor="middle" class="dg-tb">HTTP 데이터</text><text x="485" y="54" text-anchor="middle" class="dg-tm">요청/응답 메시지</text>
+          <path d="M20 84 L20 90 L620 90 L620 84" class="dg-plain" style="stroke:var(--muted)"/><text x="26" y="104" class="dg-tm">이더넷 프레임 — 한 홉 (스위치, 라우터까지), 홉마다 새로 붙임</text>
+          <path d="M130 112 L130 118 L620 118 L620 112" class="dg-plain" style="stroke:var(--muted)"/><text x="136" y="132" class="dg-tm">IP 패킷 — 끝에서 끝 (출발 호스트 → 목적 호스트)</text>
+          <path d="M240 138 L240 144 L620 144 L620 138" class="dg-plain" style="stroke:var(--muted)"/>
+        </svg>
+        <figcaption>각 계층은 아래 계층의 데이터일 뿐. TCP 세그먼트(포트)는 프로세스까지, IP는 호스트까지, 이더넷은 한 홉.</figcaption>
+      </figure>
+
+      <h3>IP 주소와 서브넷</h3>
+      <p>IP 주소는 <b>네트워크 부분 + 호스트 부분</b>이에요. <code>10.0.1.5/24</code>는 앞 24비트가 네트워크. 같은 네트워크면 직접(이더넷으로), 다르면 <b>기본 게이트웨이(라우터)</b>로 보내요. 이 판단을 <b>라우팅 테이블</b>로 해요(<code>ip route</code>).</p>
+
+      <h3>ARP: IP → MAC</h3>
+      <p>같은 LAN에서 프레임을 보내려면 상대의 MAC 주소가 필요해요. <b>ARP</b>로 "이 IP 가진 사람 MAC 알려줘"를 브로드캐스트하고 응답을 캐시해요. 다른 네트워크로 보낼 때는 게이트웨이의 MAC을 써요. MAC은 한 홉, IP는 끝에서 끝이에요.</p>
+
+      <h3>MTU와 단편화</h3>
+      <p>이더넷 프레임 최대 1500바이트(MTU). IP 패킷이 더 크면 쪼개야(fragmentation) 하는데, 비효율적이라 TCP는 처음부터 MSS = MTU − 40으로 맞춰요. 경로 중간에 MTU가 작은 구간이 있으면 Path MTU Discovery로 찾아요. VPN이나 터널링에서 MTU 문제로 "작은 요청은 되는데 큰 요청만 멈추는" 현상이 생겨요.</p>
+
+      <h3>UDP</h3>
+      <p>헤더 8바이트(포트, 길이, 체크섬)뿐. 연결, 순서, 재전송 없음. 그래서 빠르고 단순해요. DNS, 영상 통화(늦은 패킷은 버리는 게 나음), 게임, 그리고 <b>QUIC(HTTP/3)</b>가 UDP 위에 자체 신뢰성을 구현해요.</p>
+
+      <div class="backend"><b>백엔드에서는</b> 도커 브리지 네트워크, 쿠버네티스 Pod 네트워크, VPC 서브넷과 라우팅 테이블, 보안 그룹이 전부 이 장의 개념이에요. "Pod에서 외부 DB로 연결이 안 된다"를 추적할 때 <code>ip route</code>, <code>traceroute</code>, <code>tcpdump -i any port 3306</code>이 기본 도구예요. 오버레이 네트워크(VXLAN)는 헤더를 더 붙여서 MTU가 1450 등으로 줄어들어요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>캡슐화: HTTP → TCP → IP → 이더넷</li><li>IP는 끝에서 끝, MAC은 한 홉. 라우팅 테이블로 직접/게이트웨이 결정, ARP로 MAC 찾기</li><li>MTU 1500, MSS 1460</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>패킷이 라우터를 지날 때 바뀌는 헤더와 안 바뀌는 헤더는?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p>이더넷 헤더(MAC)는 홉마다 새로 붙여요(출발 = 라우터 MAC, 목적 = 다음 홉 MAC). IP 헤더의 출발/목적 IP는 그대로이고 TTL만 1 줄고 체크섬이 다시 계산돼요(NAT를 지나면 IP도 바뀌어요). TCP 헤더와 데이터는 그대로예요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <!-- ================================================================ -->
+    <div class="part-title">3~4장 LAN과 인터넷</div>
+
+    <section id="s3" data-sec>
+      <h2>3장 허브, 스위치, 라우터</h2>
+      <p class="lead">케이블을 떠난 프레임이 LAN 안에서 어떻게 전달되는가</p>
+
+      <h3>허브 → 스위치</h3>
+      <p>허브는 들어온 신호를 모든 포트로 그냥 복사해요(충돌 발생, 지금은 안 씀). <b>스위치</b>는 프레임의 출발 MAC을 보고 "이 MAC은 이 포트"를 <b>MAC 주소 테이블</b>에 학습하고, 목적 MAC에 해당하는 포트로만 보내요. 모르는 MAC이면 전체에 보내요(flooding). 2계층(L2) 장비예요.</p>
+
+      <h3>라우터</h3>
+      <p>라우터는 <b>IP 패킷</b>을 봐요(L3). 이더넷 헤더를 떼고, 목적 IP를 <b>라우팅 테이블</b>에서 찾아(가장 긴 prefix 일치) 다음 홉과 출력 포트를 정하고, TTL을 1 줄이고, 새 이더넷 헤더를 붙여 보내요. TTL이 0이 되면 버리고 ICMP Time Exceeded를 돌려줘요(<code>traceroute</code>의 원리).</p>
+
+      <h3>라우팅 테이블</h3>
+<pre><code>목적 네트워크      넥스트 홉       인터페이스
+10.0.1.0/24       직접 연결       eth0
+10.0.2.0/24       10.0.1.254     eth0
+0.0.0.0/0         10.0.1.1       eth0      ← 기본 경로</code></pre>
+      <p>라우터끼리는 라우팅 프로토콜(OSPF, BGP)로 경로를 교환해요. 인터넷 전체 경로는 <b>BGP</b>로 ISP(AS)끼리 교환해요.</p>
+
+      <h3>NAT</h3>
+      <p>사설 IP(10.x, 192.168.x)는 인터넷에서 못 써요. 라우터가 나가는 패킷의 출발 IP·포트를 공인 IP·새 포트로 바꾸고 변환 테이블에 기록, 돌아오는 패킷을 역변환해요. 밖에서 안으로 먼저 연결할 수 없어요(포트 포워딩 필요).</p>
+
+      <div class="backend"><b>백엔드에서는</b> 쿠버네티스 Service(ClusterIP)는 iptables/IPVS로 하는 NAT이에요. NodePort, 클라우드 NAT Gateway, 도커의 <code>-p 8080:80</code> 전부 NAT. NAT 테이블은 <b>연결 추적(conntrack)</b>에 의존하고 크기 한계가 있어요. 트래픽 급증 시 <code>nf_conntrack: table full, dropping packet</code>이 나면 이거예요. 또 NAT 뒤의 유휴 연결은 일정 시간 후 테이블에서 지워져서, 오래 유휴한 DB 연결이 갑자기 끊기는 이유가 돼요(TCP keepalive로 방지).</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>스위치 = MAC 테이블 학습(L2), 라우터 = 라우팅 테이블(L3)</li><li>가장 긴 prefix 일치, 기본 경로 0.0.0.0/0, TTL</li><li>NAT = 주소 변환 + 연결 추적, 유휴 연결 소멸 주의</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>스위치와 라우터의 역할 차이를 한 문장으로.</li><li>NAT 뒤에서 오래 유휴한 TCP 연결이 끊기는 이유와 대책은?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p><b>1.</b> 스위치는 같은 네트워크 안에서 MAC으로 프레임을 전달하고, 라우터는 다른 네트워크 사이에서 IP로 패킷을 전달해요.</p>
+          <p><b>2.</b> NAT 장비가 유휴 연결의 변환 엔트리를 타임아웃으로 지워서, 이후 패킷이 매핑을 못 찾고 버려지거나 RST를 받아요. 대책: TCP keepalive(<code>SO_KEEPALIVE</code>, 커널 <code>tcp_keepalive_time</code>을 타임아웃보다 짧게) 또는 애플리케이션 레벨 ping, 커넥션 풀의 유휴 검증/최대 수명 설정.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <section id="s4" data-sec>
+      <h2>4장 액세스 회선과 프로바이더</h2>
+      <p class="lead">인터넷은 ISP들의 연합이다 (짧게)</p>
+
+      <h3>인터넷의 구조</h3>
+      <p>인터넷은 하나의 네트워크가 아니라 수만 개의 <b>AS(자율 시스템)</b>, 즉 ISP·기업·클라우드의 네트워크가 서로 연결된 집합이에요. AS끼리는 <b>BGP</b>로 "나는 이 IP 대역에 갈 수 있다"를 광고하고, IX(인터넷 교환점)에서 서로 직접 연결(피어링)해요.</p>
+
+      <h3>지연의 물리적 한계</h3>
+      <p>빛의 속도는 광섬유에서 약 200,000km/s. 서울-미국 서부 왕복 약 18,000km = 최소 90ms. 라우터 처리, 큐잉이 더해져 실제 150ms 정도예요. 이 RTT는 어떤 최적화로도 줄일 수 없어요. 줄이려면 <b>가까이 두는 것</b>(CDN, 리전 선택, 엣지)뿐이에요.</p>
+
+      <h3>경로는 비대칭일 수 있다</h3>
+      <p>가는 길과 오는 길이 다를 수 있어요. BGP는 각 AS가 자기 정책으로 경로를 고르기 때문이에요. 그래서 한쪽 방향만 느린 현상이 생겨요.</p>
+
+      <div class="backend"><b>백엔드에서는</b> 리전 간 호출(서울 ↔ 버지니아)은 RTT 150ms × 왕복 횟수예요. 요청 하나에 DB 왕복이 10번이면 1.5초. 리전 간 동기 호출을 피하고, 데이터를 리전 안에 두고, 꼭 필요하면 왕복 횟수를 줄여야(배치) 해요. 클라우드의 가용 영역(AZ) 간은 1~2ms, 같은 AZ는 0.1ms대예요. 이 차이가 아키텍처를 결정해요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>인터넷 = AS들의 BGP 연합, 피어링</li><li>RTT는 물리 한계, 줄이려면 거리를 줄이거나 왕복 횟수를 줄이거나</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>서울의 API 서버가 미국의 DB를 쓰면 요청당 최소 지연은 어떻게 계산하나요?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p>RTT(약 150ms) × DB 왕복 횟수. 연결 수립까지 포함하면 TCP 1 RTT + TLS 1~2 RTT가 더해져요. 커넥션 풀로 연결 비용은 없애도 쿼리당 150ms는 못 피해요. 쿼리 5번이면 750ms.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <!-- ================================================================ -->
+    <div class="part-title">5장 서버 측 LAN — 방화벽, 캐시, 로드밸런서</div>
+
+    <section id="s5-1" data-sec>
+      <h2>5.1 방화벽</h2>
+      <p class="lead">패킷 필터링으로 들어오는 트래픽을 거른다</p>
+
+      <h3>패킷 필터링</h3>
+      <p>방화벽은 패킷의 <b>IP, 포트, 프로토콜, 방향, TCP 플래그</b>를 보고 통과/차단을 결정해요. 규칙 예: "외부 → 서버:443 허용, 외부 → 서버:22는 사무실 IP만, 나머지 거부". 내부에서 시작한 연결의 응답은 허용해야 하니, <b>상태 기반(stateful)</b> 방화벽은 연결을 추적해서 ESTABLISHED 연결의 패킷을 자동 허용해요.</p>
+
+      <h3>클라우드의 방화벽</h3>
+      <ul>
+        <li><b>보안 그룹(Security Group)</b>: 인스턴스 단위, stateful, 허용 규칙만</li>
+        <li><b>네트워크 ACL</b>: 서브넷 단위, stateless(응답도 명시 허용 필요), 허용/거부</li>
+        <li><b>쿠버네티스 NetworkPolicy</b>: Pod 단위</li>
+      </ul>
+
+      <h3>방화벽이 못 막는 것</h3>
+      <p>허용된 포트(443)로 들어오는 애플리케이션 레벨 공격(SQL 인젝션, XSS)은 못 막아요. 그건 <b>WAF</b>(웹 애플리케이션 방화벽, L7)가 HTTP 내용을 보고 거르거나 애플리케이션이 막아야 해요.</p>
+
+      <div class="backend"><b>백엔드에서는</b> "연결이 안 된다"의 절반은 보안 그룹이에요. 확인 순서: (1) 서버에서 포트가 listen 중인가(<code>ss -ltn</code>), (2) 0.0.0.0에 바인딩됐나 127.0.0.1에만 됐나, (3) 보안 그룹/NACL이 출발 IP와 포트를 허용하나, (4) 중간에 NAT·프록시가 있나. <code>nc -zv host port</code>, <code>telnet</code>으로 각 지점에서 확인해요. 그리고 방화벽이 유휴 연결을 끊는(idle timeout) 것도 흔해요. DB 연결이 "갑자기" 죽는 또 다른 원인이에요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>패킷 필터링: IP·포트·방향, stateful은 응답 자동 허용</li><li>보안 그룹(stateful) vs NACL(stateless)</li><li>L7 공격은 WAF 또는 애플리케이션 책임</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>stateful과 stateless 방화벽의 차이가 규칙 작성에 어떤 영향을 주나요?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p>stateful은 나가는 연결만 허용하면 그 응답은 자동 허용돼요. stateless는 응답 패킷(서버 → 클라이언트 임시 포트 1024~65535)도 명시적으로 허용 규칙을 써야 해요. NACL에서 응답 포트 범위를 빼먹으면 요청은 가는데 응답이 안 와요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <section id="s5-2" data-sec>
+      <h2>5.2 로드밸런서</h2>
+      <p class="lead">서버 한 대로 부족할 때 — 분산의 원리와 함정</p>
+
+      <h3>왜 필요한가</h3>
+      <p>DNS 라운드로빈으로 여러 IP를 돌려줄 수도 있지만, 죽은 서버를 빼지 못하고 캐시 때문에 즉시 반영이 안 돼요. <b>로드밸런서</b>는 하나의 IP로 받아 뒤의 서버들에 나눠 주고, <b>헬스 체크</b>로 죽은 서버를 자동으로 빼요.</p>
+
+      <h3>L4 vs L7</h3>
+      <div class="tbl"><table>
+        <tr><th></th><th>L4 (전송 계층)</th><th>L7 (애플리케이션 계층)</th></tr>
+        <tr><td>보는 것</td><td>IP, 포트</td><td>HTTP 경로, 헤더, 쿠키, 호스트</td></tr>
+        <tr><td>단위</td><td>TCP 연결 하나를 한 서버로</td><td>HTTP 요청 하나하나를 다른 서버로 가능</td></tr>
+        <tr><td>TLS</td><td>통과(passthrough)</td><td>종료(termination) 후 평문으로 뒤에 전달 가능</td></tr>
+        <tr><td>장점</td><td>빠름, 프로토콜 무관(gRPC, DB, WebSocket 그대로)</td><td>경로별 라우팅, 헤더 조작, 압축, WAF</td></tr>
+        <tr><td>예</td><td>AWS NLB, LVS, HAProxy(tcp 모드)</td><td>AWS ALB, Nginx, Envoy, HAProxy(http 모드)</td></tr>
+      </table></div>
+
+      <h3>분산 알고리즘</h3>
+      <p>라운드로빈, 가중 라운드로빈, 최소 연결(least connections), 해시(출발 IP나 URL 기준으로 같은 서버로). 응답 시간 기반도 있어요.</p>
+
+      <h3>헬스 체크</h3>
+      <p>LB가 주기적으로 각 서버에 요청해(TCP 연결 또는 <code>GET /health</code>) 실패가 N번 연속이면 뺐다가, 성공이 M번 연속이면 넣어요. 헬스 체크 엔드포인트가 DB까지 확인하면 DB 장애 때 <b>모든 서버가 동시에 빠져</b> 전체 장애가 돼요. 자기 자신의 생존(liveness)과 트래픽 받을 준비(readiness)를 구분하세요.</p>
+
+      <h3>Sticky session</h3>
+      <p>세션을 서버 메모리에 두면 같은 사용자가 같은 서버로 가야 해요. LB가 쿠키를 심어 고정해요. 부하가 쏠리고 서버가 죽으면 세션이 날아가요. 세션을 Redis 등 외부로 빼고 서버를 <b>무상태</b>로 만드는 게 정석이에요.</p>
+
+      <h3>타임아웃 불일치 (가장 흔한 사고)</h3>
+      <p>LB는 뒤 서버와의 연결을 재사용하려고 유휴 상태로 열어 둬요(idle timeout, ALB 기본 60초). 서버의 keep-alive timeout이 더 짧으면(톰캣 기본 60초, Node 기본 5초!) 서버가 먼저 닫고, LB는 모르고 그 연결로 요청을 보내 <b>502</b>가 나요. 규칙: <b>서버 keep-alive timeout > LB idle timeout</b>.</p>
+
+      <div class="backend"><b>백엔드에서는</b> LB가 TLS를 종료하면 서버는 HTTP를 받아서 <code>request.isSecure()</code>가 false이고, 클라이언트 IP는 LB IP로 보여요. <code>X-Forwarded-For</code>, <code>X-Forwarded-Proto</code> 헤더를 읽어야 해요(Spring <code>ForwardedHeaderFilter</code>, Express <code>trust proxy</code>). XFF는 클라이언트가 위조할 수 있으니 LB가 붙인 마지막 값만 믿어야 해요. 배포 시 "connection draining"(기존 요청이 끝날 때까지 기다린 후 빼기)을 설정하지 않으면 배포마다 에러가 나요. 쿠버네티스는 readiness probe + preStop hook이 이 역할이에요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>L4 = 연결 단위·빠름, L7 = 요청 단위·똑똑함</li><li>헬스 체크는 자기 생존만, 의존성 상태를 넣으면 연쇄 장애</li><li>서버 keep-alive > LB idle timeout, XFF로 원래 클라이언트 정보</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>Node.js 서버를 ALB 뒤에 뒀더니 간헐적 502가 나요. 원인과 해결은?</li><li>WebSocket 서비스에 L7 LB를 쓸 때 주의점은?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p><b>1.</b> Node의 keep-alive timeout 기본 5초 < ALB idle 60초. Node가 먼저 닫은 연결로 ALB가 요청을 보내 502. <code>server.keepAliveTimeout = 65000</code>(ALB보다 길게), <code>headersTimeout</code>도 그보다 길게 설정.</p>
+          <p><b>2.</b> WebSocket은 HTTP Upgrade 후 긴 TCP 연결이라 L7 LB가 Upgrade를 지원해야 하고, idle timeout이 연결을 끊지 않도록 길게 하거나 주기적 ping을 보내야 해요. 연결이 한 서버에 고정되므로 서버 간 메시지 전달은 Redis Pub/Sub 같은 별도 채널이 필요해요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <section id="s5-3" data-sec>
+      <h2>5.3 캐시 서버, 리버스 프록시, CDN</h2>
+      <p class="lead">서버 앞에서 요청을 대신 처리하는 것들</p>
+
+      <h3>프록시의 두 방향</h3>
+      <ul>
+        <li><b>포워드 프록시</b>: 클라이언트 쪽에 있어요. 회사 네트워크에서 외부로 나갈 때 거치는 것. 클라이언트를 숨기고, 접근 제어, 캐시.</li>
+        <li><b>리버스 프록시</b>: 서버 쪽에 있어요. 클라이언트는 프록시를 서버로 알아요. 서버를 숨기고, TLS 종료, 캐시, 압축, 정적 파일, 로드밸런싱. Nginx가 대표예요.</li>
+      </ul>
+
+      <h3>리버스 프록시가 서버를 보호하는 방법</h3>
+      <p>느린 클라이언트(모바일)가 요청을 천천히 보내면 애플리케이션 스레드가 그만큼 묶여요. Nginx는 요청 전체를 받아서(buffering) 한 번에 앱에 넘기고, 응답도 받아서 느린 클라이언트에 천천히 보내요. 앱 스레드는 빨리 풀려요. 이벤트 루프 기반이라 수만 개 유휴 연결을 싸게 들고 있어요.</p>
+
+      <h3>캐시 서버</h3>
+      <p>같은 URL의 응답을 저장했다가 돌려줘요. HTTP 캐시 헤더(부록 C)를 따라요. 프록시 캐시(Varnish, Nginx cache)는 서버 바로 앞에서, CDN은 사용자 가까이에서 캐시해요.</p>
+
+      <h3>CDN</h3>
+      <p>전 세계 엣지 서버에 콘텐츠를 캐시해요. 사용자는 DNS(GeoDNS 또는 Anycast)로 가장 가까운 엣지에 연결돼요. 정적 파일(이미지, JS)은 물론 TTL이 짧은 API 응답도 캐시할 수 있어요. TLS 종료를 엣지에서 하면 handshake RTT가 짧아져요. 엣지에서 origin까지는 CDN이 최적화된 경로와 keep-alive 연결로 가요.</p>
+      <p><b>캐시 무효화</b>: 파일을 바꿨는데 CDN이 옛것을 주는 문제. 파일명에 해시를 넣거나(<code>app.3f2a1.js</code>, 영원히 캐시), purge API를 호출해요.</p>
+
+      <div class="backend"><b>백엔드에서는</b> 앱 서버 앞에 Nginx를 두는 이유: TLS, 정적 파일, gzip, 버퍼링, 요청 크기 제한, rate limit, 그리고 앱이 재시작하는 동안 503 페이지. 쿠버네티스 Ingress 컨트롤러가 그 역할이에요. API 응답을 CDN에 캐시하려면 <code>Cache-Control: public, max-age=60</code>과 <code>Vary</code> 헤더를 정확히 써야 하고, 인증된 응답은 <code>private</code>로 막아야 해요. 안 그러면 A의 개인 정보가 B에게 가요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>리버스 프록시 = 서버 앞, TLS·캐시·버퍼링·보호</li><li>CDN = 사용자 가까운 캐시, 파일명 해시로 무효화</li><li>캐시 헤더 실수는 개인정보 유출</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>Nginx의 요청 버퍼링이 애플리케이션 서버를 어떻게 보호하나요?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p>느린 클라이언트가 요청 본문을 몇 초에 걸쳐 보내도 Nginx가 다 받은 뒤 앱에 한 번에 넘겨요. 앱 스레드는 요청 수신에 시간을 쓰지 않아요. 응답도 Nginx가 받아 두고 천천히 보내서 앱 스레드가 즉시 다음 요청을 처리해요. Slowloris 같은 공격도 Nginx 수준에서 흡수돼요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <!-- ================================================================ -->
+    <div class="part-title">6장 웹 서버에 도착하여 응답이 돌아온다</div>
+
+    <section id="s6-1" data-sec>
+      <h2>6.1 서버의 소켓 — listen, accept, 그리고 동시 처리 모델</h2>
+      <p class="lead">서버 프로그램이 연결을 받는 구조</p>
+
+      <h3>서버 소켓 호출 순서</h3>
+      <ol>
+        <li><code>socket()</code>: 소켓 생성</li>
+        <li><code>bind(fd, 0.0.0.0:8080)</code>: 포트 지정. <code>127.0.0.1</code>에 바인딩하면 외부에서 못 들어와요.</li>
+        <li><code>listen(fd, backlog)</code>: 접속 대기 상태로</li>
+        <li><code>accept(fd)</code>: 연결이 오면 <b>새 소켓(fd)</b>을 돌려줘요. 원래 listen 소켓은 계속 대기해요.</li>
+        <li>새 fd로 <code>read</code>/<code>write</code>, 끝나면 <code>close</code></li>
+      </ol>
+      <p>연결마다 fd가 하나씩 생겨요. 그래서 동시 연결 수 = fd 수이고 <code>ulimit -n</code>에 걸려요.</p>
+
+      <h3>동시 처리 모델</h3>
+      <div class="tbl"><table>
+        <tr><th>모델</th><th>동작</th><th>예</th><th>특징</th></tr>
+        <tr><td>프로세스 per 연결</td><td>accept 후 fork</td><td>옛 Apache prefork</td><td>격리 좋음, 무거움</td></tr>
+        <tr><td>스레드 per 연결/요청</td><td>스레드풀에서 하나 할당</td><td>톰캣, Apache worker</td><td>단순, 블로킹 I/O OK, 스레드 수 = 동시 요청 한계</td></tr>
+        <tr><td>이벤트 루프</td><td>epoll로 준비된 소켓만 처리</td><td>Nginx, Node.js, Netty</td><td>연결당 비용 작음, 블로킹 금지</td></tr>
+        <tr><td>하이브리드</td><td>이벤트 루프가 I/O, 워커 스레드가 처리</td><td>톰캣 NIO, Jetty</td><td>연결은 많이, 처리는 스레드로</td></tr>
+      </table></div>
+      <p>톰캣 NIO: acceptor 스레드가 accept, poller 스레드가 epoll로 데이터 도착을 감지, 데이터가 오면 워커 스레드(기본 200)에 넘겨 처리해요. 그래서 keep-alive 유휴 연결 1만 개를 들고 있어도 스레드는 200개면 돼요.</p>
+
+      <h3>스레드풀 크기</h3>
+      <p>워커 스레드 수는 "동시에 처리 중인 요청 수"의 상한이에요. 모두 DB를 기다리고 있으면 새 요청은 큐에서 대기해요. 요청당 DB 대기가 길면 스레드를 늘리거나, 비동기로 바꾸거나, 가상 스레드를 써요. 하지만 DB 커넥션 풀이 10개면 스레드 200개는 의미가 없어요. 병목은 늘 가장 좁은 곳이에요.</p>
+
+      <div class="backend"><b>백엔드에서는</b> 성능 문제를 볼 때 (1) accept 큐 넘침(연결 실패), (2) 워커 스레드 고갈(연결은 되는데 응답 지연), (3) DB 커넥션 풀 고갈(스레드는 있는데 풀 대기), (4) DB 자체 느림을 구분해야 해요. 각각 <code>ss -ltn</code>, 스레드 덤프/활성 스레드 메트릭, HikariCP pending 메트릭, 슬로우 쿼리 로그로 봐요. 그리고 <code>server.tomcat.threads.max</code>, <code>accept-count</code>, <code>max-connections</code>가 각각 워커 수, backlog, poller가 들고 있을 최대 연결 수예요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>socket → bind → listen → accept(새 fd) → read/write</li><li>스레드 per 요청 vs 이벤트 루프 vs 하이브리드(톰캣 NIO)</li><li>워커 스레드 = 동시 처리 상한, 병목은 가장 좁은 곳</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>톰캣 NIO가 스레드 200개로 유휴 연결 1만 개를 유지할 수 있는 이유는?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p>연결과 처리를 분리했기 때문이에요. 유휴 연결은 poller 스레드 하나가 epoll로 감시만 하고, 데이터가 실제로 도착한 연결만 워커 스레드에 넘겨요. 스레드는 "요청을 처리하는 동안"만 점유돼요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <section id="s6-2" data-sec>
+      <h2>6.2 응답이 브라우저로 돌아온다 — 전체 흐름 복습</h2>
+      <p class="lead">"URL 입력부터 화면까지"를 한 번에</p>
+
+      <h3>전체 흐름</h3>
+      <ol>
+        <li><b>브라우저</b>: URL 파싱, HSTS 확인, 캐시 확인(있으면 끝)</li>
+        <li><b>DNS</b>: 리졸버 → 재귀 서버(캐시) → 루트/TLD/권한 서버 → IP</li>
+        <li><b>TCP</b>: socket, connect → 3-way handshake (1 RTT)</li>
+        <li><b>TLS</b>: ClientHello/ServerHello, 인증서 검증, 키 교환 (TLS 1.3은 1 RTT)</li>
+        <li><b>HTTP 요청</b>: write → 송신 버퍼 → MSS로 분할 → IP/이더넷 캡슐화 → 스위치 → 라우터들(BGP 경로) → 서버 측 LAN</li>
+        <li><b>서버 측</b>: 방화벽 → CDN/LB(TLS 종료, 헬스 체크된 서버로) → 리버스 프록시 → 앱 서버(accept 큐 → poller → 워커 스레드)</li>
+        <li><b>애플리케이션</b>: 라우팅, 인증, 비즈니스 로직, DB(커넥션 풀 → 쿼리 → 결과), 캐시</li>
+        <li><b>HTTP 응답</b>: write → 역순으로 돌아감. cwnd에 따라 여러 RTT에 걸쳐</li>
+        <li><b>브라우저</b>: 응답 파싱, 캐시 저장, HTML 파싱 → 추가 리소스 요청(keep-alive 재사용, HTTP/2 멀티플렉싱) → 렌더링</li>
+      </ol>
+      <figure class="diagram">
+        <svg viewBox="0 0 660 130" role="img" aria-label="요청의 전체 경로">
+          <text x="49" y="24" text-anchor="middle" class="dg-tm">캐시 확인</text><text x="141" y="24" text-anchor="middle" class="dg-tm">0~100ms</text><text x="233" y="24" text-anchor="middle" class="dg-tm">2~3 RTT</text><text x="325" y="24" text-anchor="middle" class="dg-tm">TLS 종료</text><text x="417" y="24" text-anchor="middle" class="dg-tm">버퍼링</text><text x="509" y="24" text-anchor="middle" class="dg-tm">큐 → 워커</text><text x="601" y="24" text-anchor="middle" class="dg-tm">풀 → 쿼리</text>
+          <rect x="8" y="35" width="82" height="40" rx="6" class="dg-box"/><text x="49" y="60" text-anchor="middle" class="dg-t">브라우저</text>
+          <rect x="100" y="35" width="82" height="40" rx="6" class="dg-box"/><text x="141" y="60" text-anchor="middle" class="dg-t">DNS</text>
+          <rect x="192" y="35" width="82" height="40" rx="6" class="dg-box"/><text x="233" y="60" text-anchor="middle" class="dg-t">TCP + TLS</text>
+          <rect x="284" y="35" width="82" height="40" rx="6" class="dg-box"/><text x="325" y="60" text-anchor="middle" class="dg-t">CDN / LB</text>
+          <rect x="376" y="35" width="82" height="40" rx="6" class="dg-box"/><text x="417" y="60" text-anchor="middle" class="dg-t">리버스 프록시</text>
+          <rect x="468" y="35" width="82" height="40" rx="6" class="dg-acc"/><text x="509" y="60" text-anchor="middle" class="dg-tb">앱 서버</text>
+          <rect x="560" y="35" width="82" height="40" rx="6" class="dg-box"/><text x="601" y="60" text-anchor="middle" class="dg-t">DB / 캐시</text>
+          <path d="M90 55 L98 55" class="dg-l"/><path d="M182 55 L190 55" class="dg-l"/><path d="M274 55 L282 55" class="dg-l"/><path d="M366 55 L374 55" class="dg-l"/><path d="M458 55 L466 55" class="dg-l"/><path d="M550 55 L558 55" class="dg-l"/>
+          <path d="M601 75 L601 105 L49 105 L49 77" class="dg-lm dg-ld"/><text x="325" y="121" text-anchor="middle" class="dg-tm">응답은 역순으로 (cwnd에 따라 여러 RTT)</text>
+        </svg>
+        <figcaption>"API가 느리다"는 이 구간 중 어디인지부터 나눠야 한다. curl -w로 구간별 측정.</figcaption>
+      </figure>
+
+      <h3>지연이 쌓이는 곳</h3>
+      <div class="tbl"><table>
+        <tr><th>구간</th><th>전형적 지연</th><th>줄이는 법</th></tr>
+        <tr><td>DNS</td><td>0~100ms</td><td>캐시, TTL, DNS prefetch</td></tr>
+        <tr><td>TCP handshake</td><td>1 RTT</td><td>keep-alive, HTTP/2, QUIC(0-RTT)</td></tr>
+        <tr><td>TLS handshake</td><td>1~2 RTT</td><td>TLS 1.3, 세션 재개, CDN 엣지 종료</td></tr>
+        <tr><td>요청 전송 + 서버 처리</td><td>앱에 달림</td><td>DB 왕복 줄이기, 캐시, 비동기</td></tr>
+        <tr><td>응답 전송</td><td>크기/RTT에 비례, slow start</td><td>압축, 크기 줄이기, 연결 재사용</td></tr>
+      </table></div>
+
+      <div class="backend"><b>백엔드에서는</b> "API가 느리다"를 들으면 어느 구간인지 먼저 나눠야 해요. <code>curl -w "@format.txt"</code>로 <code>time_namelookup</code>, <code>time_connect</code>, <code>time_appconnect</code>(TLS), <code>time_starttransfer</code>(TTFB), <code>time_total</code>을 구간별로 보세요. TTFB가 크면 서버, total − TTFB가 크면 응답 크기/네트워크예요. 브라우저 DevTools의 Timing 탭도 같은 구간을 보여줘요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>DNS → TCP → TLS → HTTP → LB/프록시 → 앱 → DB → 역순</li><li>연결 수립만 2~3 RTT, 재사용이 핵심</li><li>지연은 구간별로 나눠서 측정</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>"브라우저에 URL을 입력하면?"을 끊기지 않고 3분 안에 설명해보세요. 각 단계에서 장애가 나면 사용자가 보는 증상도 함께.</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p>위 9단계를 따라가세요. 증상 예: DNS 실패 → "사이트를 찾을 수 없음", TCP 실패 → "연결 거부/시간 초과", TLS 실패 → 인증서 경고, LB 뒤 서버 전멸 → 502/503, 앱 느림 → 로딩 스피너만 오래, 응답 전송 중 끊김 → 일부만 렌더링.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <!-- ================================================================ -->
+    <div class="part-title">부록 — HTTP 완벽 가이드 핵심</div>
+
+    <section id="a-http2" data-sec>
+      <h2>A. 연결 관리 — HTTP/1.1, HTTP/2, HTTP/3</h2>
+      <p class="lead">HTTP 완벽 가이드 4장 + 그 이후의 발전</p>
+
+      <h3>HTTP/1.0 → 1.1: keep-alive</h3>
+      <p>1.0은 요청마다 TCP 연결을 새로 맺었어요(handshake + slow start 매번). 1.1은 <b>기본이 persistent connection</b>이에요. 한 연결로 여러 요청을 순서대로 보내요. <code>Connection: close</code>로 명시해야 끊어요.</p>
+      <p>문제: 한 연결에서 요청은 <b>직렬</b>이에요. 앞 응답이 느리면 뒤가 기다려요(<b>HOL blocking</b>). 파이프라이닝(응답 안 기다리고 여러 요청 보내기)은 있지만 프록시 호환 문제로 브라우저가 안 써요. 대신 브라우저는 호스트당 6개 연결을 열어요.</p>
+
+      <h3>HTTP/2</h3>
+      <ul>
+        <li><b>바이너리 프레이밍</b>: 텍스트 대신 프레임 단위</li>
+        <li><b>멀티플렉싱</b>: 한 TCP 연결 안에 여러 <b>스트림</b>. 요청/응답이 섞여서 동시에 흘러요. HTTP 레벨 HOL blocking 해결.</li>
+        <li><b>헤더 압축(HPACK)</b>: 반복되는 헤더(쿠키, User-Agent)를 인덱스로</li>
+        <li><b>서버 푸시</b>: 요청 전에 리소스 미리 보내기(실제로는 거의 안 쓰고 폐기 추세)</li>
+        <li>우선순위, 흐름 제어(스트림 단위)</li>
+      </ul>
+      <p>남은 문제: TCP는 순서를 보장해야 해서 패킷 하나가 유실되면 <b>모든 스트림</b>이 재전송을 기다려요(TCP 레벨 HOL blocking). 손실률이 높은 모바일에서 HTTP/1.1 연결 6개보다 나쁠 수 있어요.</p>
+
+      <h3>HTTP/3 (QUIC)</h3>
+      <p>TCP 대신 <b>UDP 위에 QUIC</b>를 구현했어요. QUIC가 신뢰성, 혼잡 제어, TLS 1.3을 내장해요.</p>
+      <ul>
+        <li>스트림이 <b>독립적</b>: 한 스트림의 패킷 손실이 다른 스트림을 막지 않아요.</li>
+        <li><b>연결 수립 1 RTT</b>(TCP+TLS 합쳐서), 재접속은 <b>0-RTT</b></li>
+        <li><b>연결 마이그레이션</b>: 연결을 IP/포트가 아니라 Connection ID로 식별해서 Wi-Fi ↔ LTE 전환에도 유지</li>
+      </ul>
+      <p>UDP를 막는 네트워크가 있어 TCP 폴백이 필요해요. 커널이 아닌 사용자 공간 구현이라 CPU를 더 써요.</p>
+
+      <div class="backend"><b>백엔드에서는</b> 서버 간 통신(마이크로서비스)에서 HTTP/1.1 클라이언트가 커넥션 풀 없이 매번 새 연결을 맺는 게 가장 흔한 성능 낭비예요. 커넥션 풀 크기, 풀당 호스트 최대 연결, 유휴 타임아웃을 반드시 설정하세요. gRPC는 HTTP/2 위라 연결 하나로 멀티플렉싱해요. 그래서 <b>L4 LB 뒤에서 gRPC는 한 서버에 몰려요</b>(연결이 하나니까). L7 LB(요청 단위 분산)나 클라이언트 사이드 LB가 필요해요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>1.1 = keep-alive, 직렬 → HOL blocking</li><li>2 = 멀티플렉싱, 헤더 압축, 하지만 TCP HOL 남음</li><li>3 = QUIC/UDP, 스트림 독립, 0-RTT, 연결 마이그레이션</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>gRPC 서비스가 L4 LB 뒤에서 부하가 안 나뉘는 이유와 해결책은?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p>gRPC는 HTTP/2 연결 하나에 모든 요청을 멀티플렉싱해요. L4 LB는 연결 단위로 분산하니 클라이언트 하나의 모든 요청이 한 서버로 가요. 해결: L7 LB(Envoy, ALB gRPC 모드)로 요청 단위 분산, 또는 클라이언트가 서버 목록을 알고 직접 라운드로빈(클라이언트 사이드 LB, 쿠버네티스 headless service), 또는 연결 최대 수명을 짧게 해 주기적 재연결.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <section id="a-cache" data-sec>
+      <h2>B. 캐시</h2>
+      <p class="lead">HTTP 완벽 가이드 7장 — 요청을 서버까지 보내지 않는 기술</p>
+
+      <h3>캐시의 두 질문</h3>
+      <ol>
+        <li><b>신선한가(freshness)</b>: 서버에 안 물어보고 바로 써도 되는가</li>
+        <li><b>재검증(revalidation)</b>: 신선하지 않을 때 "아직 그대로인가"를 싸게 확인</li>
+      </ol>
+
+      <h3>신선도: Cache-Control</h3>
+      <div class="tbl"><table>
+        <tr><th>지시어</th><th>의미</th></tr>
+        <tr><td><code>max-age=N</code></td><td>N초 동안 신선. 서버에 안 물어봄</td></tr>
+        <tr><td><code>s-maxage=N</code></td><td>공유 캐시(CDN, 프록시)용 max-age</td></tr>
+        <tr><td><code>no-cache</code></td><td>저장은 하되 쓰기 전에 <b>항상 재검증</b></td></tr>
+        <tr><td><code>no-store</code></td><td>아예 저장 금지(민감 정보)</td></tr>
+        <tr><td><code>private</code></td><td>브라우저만 저장, 공유 캐시 금지(개인화 응답)</td></tr>
+        <tr><td><code>public</code></td><td>공유 캐시 허용(인증 응답도)</td></tr>
+        <tr><td><code>immutable</code></td><td>신선한 동안 재검증도 안 함(해시 파일명)</td></tr>
+        <tr><td><code>stale-while-revalidate=N</code></td><td>만료 후 N초는 옛것을 주면서 뒤에서 갱신</td></tr>
+      </table></div>
+
+      <h3>재검증: 조건부 요청</h3>
+      <ul>
+        <li>서버가 <code>ETag: "abc123"</code>(내용 해시) 또는 <code>Last-Modified</code>를 응답에 넣어요.</li>
+        <li>캐시가 만료되면 클라이언트가 <code>If-None-Match: "abc123"</code>으로 요청해요.</li>
+        <li>같으면 서버는 <b>304 Not Modified</b>(본문 없음)로 응답, 다르면 200과 새 본문.</li>
+      </ul>
+      <p>본문 전송을 아끼지만 서버 왕복은 있어요. 서버는 ETag 비교를 본문 생성 전에 할 수 있어야 효과가 커요.</p>
+
+      <h3>Vary</h3>
+      <p>같은 URL이라도 <code>Accept-Encoding</code>이나 <code>Accept-Language</code>에 따라 응답이 다르면 <code>Vary: Accept-Encoding</code>으로 알려요. 캐시가 헤더 값별로 따로 저장해요. <code>Vary: Cookie</code>나 <code>Vary: *</code>는 사실상 캐시 불가예요.</p>
+
+      <h3>캐시 가능한 조건</h3>
+      <p>GET/HEAD, 상태 코드 200/301/404 등, <code>no-store</code> 아님, <code>Authorization</code> 헤더가 있으면 공유 캐시는 <code>public</code> 명시 없이는 저장 안 함.</p>
+
+      <div class="backend"><b>백엔드에서는</b> API 응답에 캐시 헤더를 안 쓰면 브라우저가 휴리스틱으로 캐시할 수도 있어요(Last-Modified 기반). 명시하세요. 동적 API는 <code>Cache-Control: no-store</code> 또는 <code>private, no-cache</code>, 공개 조회 API는 <code>public, max-age=60, stale-while-revalidate=300</code>처럼. 스프링의 <code>ETag</code> 필터(<code>ShallowEtagHeaderFilter</code>)는 본문을 만든 뒤 해시하므로 서버 부하는 안 줄고 전송량만 줄어요. 그리고 이 HTTP 캐시 모델(TTL + 재검증 + 키별 변형)은 Redis 캐시 설계에도 그대로 쓰는 사고방식이에요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>max-age = 신선, no-cache = 매번 재검증, no-store = 저장 금지, private = 개인</li><li>ETag + If-None-Match → 304</li><li>Vary로 변형 구분, 인증 응답은 public 없이 공유 캐시 안 됨</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li><code>no-cache</code>와 <code>no-store</code>의 차이는?</li><li>로그인한 사용자의 "내 주문 목록" 응답에 <code>Cache-Control: public, max-age=300</code>을 붙이면?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p><b>1.</b> no-cache는 저장은 하고 쓸 때마다 서버에 재검증(304면 재사용). no-store는 저장 자체를 안 해요. no-cache는 "항상 최신 확인", no-store는 "흔적 남기지 마".</p>
+          <p><b>2.</b> CDN/프록시가 이 응답을 저장하고 같은 URL을 요청한 <b>다른 사용자</b>에게 줘요. 개인정보 유출 사고예요. <code>private</code>(또는 no-store)로 해야 해요. 이런 사고가 실제로 여러 번 있었어요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <section id="a-state" data-sec>
+      <h2>C. 상태와 인증 — 쿠키, 세션, 토큰, CORS</h2>
+      <p class="lead">HTTP 완벽 가이드 11~12장 — 상태 없는 프로토콜에 상태를 얹는 법</p>
+
+      <h3>쿠키</h3>
+      <p>서버가 <code>Set-Cookie: sid=abc; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=3600</code>으로 심으면, 브라우저가 이후 같은 도메인 요청에 <code>Cookie: sid=abc</code>를 자동으로 붙여요.</p>
+      <ul>
+        <li><b>HttpOnly</b>: JS에서 접근 불가(XSS로 탈취 방지)</li>
+        <li><b>Secure</b>: HTTPS에서만 전송</li>
+        <li><b>SameSite</b>: 다른 사이트에서 시작된 요청에 쿠키를 보낼지. <code>Lax</code>(기본, 링크 이동 GET만), <code>Strict</code>, <code>None</code>(교차 사이트 허용, Secure 필수). CSRF 방어의 핵심.</li>
+        <li><b>Domain</b>: 서브도메인 공유 여부</li>
+      </ul>
+
+      <h3>세션 vs 토큰</h3>
+      <div class="tbl"><table>
+        <tr><th></th><th>서버 세션</th><th>JWT 같은 자기 완결 토큰</th></tr>
+        <tr><td>저장</td><td>서버(메모리/Redis)에 상태, 쿠키엔 ID만</td><td>클라이언트가 서명된 토큰 보유, 서버는 상태 없음</td></tr>
+        <tr><td>검증</td><td>저장소 조회</td><td>서명 검증만(저장소 불필요)</td></tr>
+        <tr><td>무효화</td><td>즉시(저장소에서 삭제)</td><td>어려움(만료까지 유효, 블랙리스트 필요)</td></tr>
+        <tr><td>확장</td><td>공유 저장소 필요</td><td>서버 추가 쉬움</td></tr>
+      </table></div>
+      <p>JWT를 쓰면서 블랙리스트를 Redis에 두면 결국 세션과 같아져요. 짧은 access 토큰 + 긴 refresh 토큰(서버 저장)이 흔한 타협이에요.</p>
+
+      <h3>인증 헤더</h3>
+      <p><code>Authorization: Bearer &lt;token&gt;</code>이 API 표준. <code>Basic</code>은 base64(id:pw)라 HTTPS 필수. 401은 "누군지 모름"(인증 실패), 403은 "누군지 알지만 권한 없음".</p>
+
+      <h3>CORS</h3>
+      <p>브라우저의 <b>동일 출처 정책</b>: 스크립트는 다른 출처(스킴+호스트+포트)의 응답을 읽을 수 없어요. API가 다른 도메인이면 서버가 <code>Access-Control-Allow-Origin</code>으로 허용해야 해요. 단순하지 않은 요청(PUT, JSON 본문, 커스텀 헤더)은 브라우저가 먼저 <b>OPTIONS preflight</b>를 보내 <code>Access-Control-Allow-Methods/Headers</code>를 확인해요. 쿠키를 보내려면 <code>Access-Control-Allow-Credentials: true</code>와 Origin을 <code>*</code>가 아닌 명시로.</p>
+      <p><b>CORS는 서버 보호가 아니에요.</b> curl은 CORS를 무시해요. 브라우저 사용자를 보호하는 거예요. 서버 보호는 인증·인가예요.</p>
+
+      <div class="backend"><b>백엔드에서는</b> CORS 에러는 서버 로그에 안 남아요(브라우저가 응답을 막은 것). preflight OPTIONS에 인증 필터가 401을 주면 CORS 실패로 보여요. OPTIONS는 인증 전에 통과시키세요. <code>Access-Control-Allow-Origin: *</code> + credentials는 브라우저가 거부해요. 그리고 SameSite=Lax 기본값 때문에 다른 도메인의 프론트에서 쿠키 인증이 안 되는 건 설계 문제이지 버그가 아니에요. 같은 사이트(서브도메인)로 두거나 토큰 방식을 쓰세요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>쿠키 = 브라우저 자동 첨부, HttpOnly/Secure/SameSite 필수</li><li>세션 = 서버 상태·즉시 무효화, 토큰 = 무상태·무효화 어려움</li><li>CORS = 브라우저 정책, preflight는 인증 전 통과</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>CSRF 공격이 무엇이고 SameSite 쿠키가 어떻게 막나요?</li><li>JWT로 "로그아웃 즉시 무효화"를 하려면?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p><b>1.</b> 악성 사이트가 사용자의 브라우저로 우리 사이트에 요청(폼 POST 등)을 보내면 브라우저가 쿠키를 자동 첨부해 인증된 요청이 돼요. SameSite=Lax/Strict는 다른 사이트에서 시작된 요청에 쿠키를 안 붙여서 막아요. 추가로 CSRF 토큰, Origin 헤더 검사.</p>
+          <p><b>2.</b> 토큰 ID(jti)를 서버 블랙리스트(Redis, 만료까지 TTL)에 넣고 매 요청 확인. 또는 access 토큰을 매우 짧게(5분) 하고 refresh 토큰만 서버에서 관리해 폐기. 전자는 사실상 세션 방식으로 회귀예요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <section id="a-tls" data-sec>
+      <h2>D. HTTPS와 TLS</h2>
+      <p class="lead">HTTP 완벽 가이드 14장 — 암호화, 인증서, handshake</p>
+
+      <h3>TLS가 주는 것</h3>
+      <ul>
+        <li><b>기밀성</b>: 중간에서 못 읽음(대칭키 암호화)</li>
+        <li><b>무결성</b>: 중간에서 못 바꿈(MAC/AEAD)</li>
+        <li><b>인증</b>: 상대가 진짜 그 서버인지(인증서)</li>
+      </ul>
+
+      <h3>대칭키 + 비대칭키</h3>
+      <p>대칭키(AES)는 빠르지만 키를 미리 공유해야 해요. 비대칭키(RSA, ECDHE)는 공개키로 암호화하면 개인키로만 풀 수 있지만 느려요. TLS는 <b>비대칭(정확히는 ECDHE 키 교환)으로 세션 키를 합의하고, 데이터는 대칭키로</b> 암호화해요. ECDHE는 매 연결마다 임시 키를 써서 서버 개인키가 나중에 유출돼도 과거 트래픽을 못 풀어요(<b>forward secrecy</b>).</p>
+
+      <h3>인증서와 CA</h3>
+      <p>인증서 = "이 공개키는 example.com 것" + CA의 서명. 브라우저는 내장된 루트 CA 목록으로 서명 체인을 검증해요: <b>서버 인증서 → 중간 CA → 루트 CA</b>. 서버는 중간 인증서까지 함께 보내야 해요. 빠뜨리면 일부 클라이언트(특히 Java, 오래된 안드로이드)에서만 실패해요. 도메인 일치(SAN), 유효 기간, 폐기 여부(OCSP)도 확인해요. Let's Encrypt로 무료 자동 발급이 표준이 됐어요.</p>
+
+      <h3>TLS 1.3 handshake</h3>
+<pre><code>Client                                   Server
+  │ ── ClientHello (지원 암호, 키 교환용 공개값) ──→ │
+  │ ←─ ServerHello (선택 암호, 키 교환용 공개값)      │
+  │    + 인증서 + 서명 + Finished ─────────────── │
+  │ ── Finished ────────────────────────────────→ │   ← 여기서부터 암호화 데이터
+  1 RTT (TLS 1.2는 2 RTT)</code></pre>
+      <p>세션 재개(session ticket)로 재접속 시 0-RTT 데이터도 가능해요(재전송 공격 위험이 있어 멱등 요청만).</p>
+
+      <h3>SNI와 TLS 종료</h3>
+      <p>한 IP에 여러 도메인을 호스팅하면 서버는 어떤 인증서를 줄지 알아야 해요. ClientHello에 <b>SNI</b>(서버 이름)가 평문으로 들어가요. LB/CDN이 TLS를 종료하면 그 뒤는 평문 HTTP예요(내부망 신뢰). 끝까지 암호화하려면 재암호화(re-encrypt)하거나 mTLS(서비스 메시)를 써요.</p>
+
+      <div class="backend"><b>백엔드에서는</b> "javax.net.ssl.SSLHandshakeException: unable to find valid certification path"는 JVM 트러스트스토어에 그 CA가 없거나 서버가 중간 인증서를 안 보낸 거예요. <code>openssl s_client -connect host:443 -servername host</code>로 체인을 확인하세요. 내부 서비스 간 mTLS는 클라이언트도 인증서를 내는 거예요. 인증서 만료는 가장 흔한 "예고된 장애"예요. 만료 30일 전 알람을 걸고 자동 갱신하세요. TLS handshake는 CPU를 꽤 쓰니, 서버 간 통신에서 연결을 재사용하지 않으면 handshake 비용이 요청 처리 비용을 넘기도 해요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>비대칭으로 키 합의, 대칭으로 데이터. ECDHE = forward secrecy</li><li>인증서 체인: 서버 → 중간 → 루트, 중간 인증서 누락 주의</li><li>TLS 1.3 = 1 RTT, SNI 평문, 종료 지점 이후는 평문</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>HTTPS인데도 중간자가 볼 수 있는 정보는?</li><li>서버 개인키가 유출되면 과거에 캡처한 트래픽을 복호화할 수 있나요?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p><b>1.</b> 목적 IP와 포트, SNI(도메인 이름, ECH 미적용 시), 패킷 크기와 타이밍, DNS 질의(DoH 미적용 시). URL 경로, 헤더, 본문은 못 봐요.</p>
+          <p><b>2.</b> ECDHE를 쓴 TLS 1.3(1.2에서도 ECDHE 스위트)이면 못 해요. 세션 키는 매 연결 임시 키로 만들어졌고 개인키는 서명에만 쓰였어요. RSA 키 교환(TLS 1.2 이하, 지금은 비권장)이면 가능해요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <!-- ================================================================ -->
+    <div class="part-title">실습</div>
+
+    <section id="lab" data-sec>
+      <h2>실습 과제</h2>
+      <p class="lead">패킷을 직접 보면 책의 모든 문장이 구체화돼요.</p>
+      <ul class="lab">
+        <li><b>1장</b> <code>dig +trace api.example.com</code>으로 루트 → TLD → 권한 서버를 따라가고, <code>dig</code>의 TTL 값이 두 번째 조회에서 줄어드는 것 확인하기</li>
+        <li><b>2장</b> Wireshark(또는 <code>tcpdump -i any port 80 -w cap.pcap</code>)로 <code>curl http://example.com</code>을 캡처해 SYN/SYN+ACK/ACK, 데이터, FIN 흐름과 시퀀스 번호 읽기</li>
+        <li><b>2장</b> <code>ss -tan state time-wait | wc -l</code>, <code>ss -tan state close-wait</code>로 서버의 소켓 상태 분포 보기. keep-alive 없이 curl을 100번 돌린 뒤 TIME_WAIT 변화 관찰</li>
+        <li><b>3장</b> <code>ip route</code>, <code>arp -a</code>(또는 <code>ip neigh</code>), <code>traceroute</code>로 내 머신에서 외부까지 경로 확인하기</li>
+        <li><b>5장</b> Nginx를 리버스 프록시로 앞에 두고 <code>proxy_read_timeout</code>, <code>keepalive</code> 설정을 바꿔가며 백엔드 keep-alive timeout과의 불일치로 502를 재현하기</li>
+        <li><b>6장</b> <code>curl -w "dns:%{time_namelookup} tcp:%{time_connect} tls:%{time_appconnect} ttfb:%{time_starttransfer} total:%{time_total}\n" -o /dev/null -s https://...</code>로 구간별 지연 측정하기</li>
+        <li><b>부록</b> <code>curl -v</code>로 ETag를 받아 <code>If-None-Match</code>로 다시 요청해 304 받기. <code>openssl s_client</code>로 인증서 체인 출력해 보기</li>
+      </ul>
+      <label class="done"><input type="checkbox"> 실습 완료</label>
+    </section>
+
+    <div class="pager">
+      <a href="01-os.html"><small>이전</small>← 1. 운영체제</a>
+      <a class="next" href="03-database.html"><small>다음</small>3. 데이터베이스 →</a>
+    </div>
+  </main>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

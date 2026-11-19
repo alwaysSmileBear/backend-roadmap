@@ -1,0 +1,586 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>4. 자료구조와 알고리즘 — 백엔드 기본기</title>
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("roadmap:theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body data-chapter="dsa">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text)"/></marker>
+<marker id="arra" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+<marker id="arrm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--muted)"/></marker>
+<marker id="arrw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--warn)"/></marker>
+<marker id="arrg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--done)"/></marker>
+</defs></svg><div class="layout">
+  <nav class="side">
+    <a class="home" href="index.html">← 로드맵 홈</a>
+    <h1>4. 자료구조와 알고리즘</h1>
+    <p class="sub">Hello Coding 알고리즘 흐름 + 실무 구조 · 상시 병행</p>
+    <div class="progress">
+      진행률 <b id="pct">0%</b>
+      <div class="bar"><span id="bar"></span></div>
+      <div class="tools">
+        <button data-act="open">답 모두 열기</button>
+        <button data-act="close">답 모두 닫기</button>
+        <button data-act="reset">초기화</button>
+        <button class="theme-btn" type="button">테마: 시스템</button>
+      </div>
+    </div>
+    <ol id="toc"></ol>
+  </nav>
+
+  <main>
+    <header class="chap-head">
+      <h1>자료구조와 알고리즘</h1>
+      <p class="meta">기준 교재: Hello Coding 그림으로 개념을 이해하는 알고리즘 (입문) + Introduction to Algorithms (참고) · 상시 병행</p>
+      <p>이 챕터의 목표는 코딩 테스트가 아니에요. <b>"이 자료구조를 왜 썼는지, 복잡도가 어떻게 되는지"를 설명할 수 있는 것</b>이에요. 그래서 각 장의 마지막에는 그 구조가 DB·Redis·JVM·분산 시스템 어디에 숨어 있는지를 연결해요. 구성은 『Hello Coding 알고리즘』의 순서(복잡도 → 배열/리스트 → 정렬 → 해시 → 그래프 → 그리디/DP)를 따르되, 백엔드에 중요한 트리와 실무 구조를 보강했어요.</p>
+      <p>하루 한 문제씩 풀면서 각 장을 읽으면 가장 효과가 좋아요. 문제는 그 장의 자료구조를 쓰는 걸로 고르세요.</p>
+      <div class="books">
+        <div class="book"><b>Hello Coding 그림으로 개념을 이해하는 알고리즘 <span class="tag easy">입문</span></b><span>Aditya Bhargava · 얇고 직관적, 첫 책으로 최적</span></div>
+        <div class="book"><b>Introduction to Algorithms (CLRS) <span class="tag deep">참고</span></b><span>특정 주제를 깊게 볼 때만 해당 장을</span></div>
+        <div class="book"><b>파이썬 알고리즘 인터뷰 / 자바로 배우는 코딩 테스트</b><span>문제 풀이 연습용</span></div>
+      </div>
+    </header>
+
+    <!-- ================================================================ -->
+    <div class="part-title">1부 기초</div>
+
+    <section id="d01" data-sec>
+      <h2>1장 시간복잡도와 공간복잡도</h2>
+      <p class="lead">"얼마나 빠른가"가 아니라 "입력이 커지면 얼마나 느려지는가"</p>
+
+      <h3>Big-O</h3>
+      <p>입력 크기 n에 대해 연산 횟수가 <b>어떤 함수로 증가하는지</b>를 나타내요. 상수와 낮은 차수 항은 버려요. 3n² + 100n + 5 = O(n²).</p>
+      <div class="tbl"><table>
+        <tr><th>복잡도</th><th>이름</th><th>예</th><th>n=10⁶일 때 대략</th></tr>
+        <tr><td>O(1)</td><td>상수</td><td>배열 인덱스, 해시 조회</td><td>1</td></tr>
+        <tr><td>O(log n)</td><td>로그</td><td>이진 탐색, B-Tree 탐색</td><td>20</td></tr>
+        <tr><td>O(n)</td><td>선형</td><td>리스트 순회, 풀스캔</td><td>10⁶</td></tr>
+        <tr><td>O(n log n)</td><td>선형 로그</td><td>비교 정렬</td><td>2×10⁷</td></tr>
+        <tr><td>O(n²)</td><td>이차</td><td>이중 루프, 버블 정렬</td><td>10¹² (불가)</td></tr>
+        <tr><td>O(2ⁿ)</td><td>지수</td><td>부분집합 전부</td><td>n=40이면 이미 10¹²</td></tr>
+      </table></div>
+      <p>경험 규칙: 1초에 약 10⁸ 연산. n=10⁵면 O(n²)은 10¹⁰이라 불가, O(n log n)은 OK.</p>
+
+      <h3>최악·평균·상환</h3>
+      <ul>
+        <li><b>최악</b>: 보통 Big-O가 말하는 것. 해시는 최악 O(n)(모두 충돌)이지만 평균 O(1).</li>
+        <li><b>상환(amortized)</b>: 가끔 비싼 연산이 있어도 전체 평균. 동적 배열의 append는 가끔 O(n) 복사가 있지만 상환 O(1).</li>
+      </ul>
+
+      <h3>공간복잡도</h3>
+      <p>추가로 쓰는 메모리. 재귀는 호출 깊이만큼 스택을 써요. 깊이 10만이면 스택 오버플로. 반복으로 바꾸거나 명시적 스택.</p>
+
+      <h3>실무에서 숨은 O(n²)</h3>
+      <ul>
+        <li>루프 안에서 <code>list.contains()</code>, <code>list.remove(obj)</code>, <code>indexOf()</code></li>
+        <li>루프 안에서 문자열 <code>+=</code> (매번 새 문자열 복사) → <code>StringBuilder</code></li>
+        <li>루프 안에서 DB 쿼리 (N+1) — 복잡도에 네트워크 RTT가 곱해져 최악</li>
+        <li>정렬된 리스트에 하나씩 삽입하면서 매번 정렬</li>
+      </ul>
+
+      <div class="backend"><b>백엔드에서는</b> "개발 환경에서는 빠른데 운영에서 느리다"의 대부분은 복잡도 문제예요. 데이터 100건에서는 O(n²)도 1만 번이지만 10만 건에서는 100억 번이에요. 코드 리뷰에서 "이 루프 안에 뭐가 있지?"를 습관적으로 보세요. 그리고 상수도 중요해요. 같은 O(1)이어도 해시 조회(수십 ns)와 Redis 조회(수백 µs)와 DB 조회(수 ms)는 10⁴배 차이예요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>Big-O = 증가율, 상수 무시. 1초 ≈ 10⁸ 연산</li><li>루프 안의 O(n) 연산 = O(n²). 루프 안의 I/O는 더 나쁨</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>두 리스트 A, B(각 n개)의 교집합을 구하는 가장 단순한 방법과 개선한 방법의 복잡도는?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p>단순: A의 각 원소에 대해 B를 순회 → O(n²). 개선: B를 HashSet으로 만들고(O(n)) A를 순회하며 contains(O(1)) → O(n). 또는 둘 다 정렬 후 투 포인터 → O(n log n).</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <section id="d02" data-sec>
+      <h2>2장 배열, 연결 리스트, 스택, 큐</h2>
+      <p class="lead">가장 기본적인 선형 구조와 그 트레이드오프</p>
+
+      <h3>배열 vs 연결 리스트</h3>
+      <div class="tbl"><table>
+        <tr><th>연산</th><th>배열(동적 배열)</th><th>연결 리스트</th></tr>
+        <tr><td>인덱스 접근</td><td>O(1)</td><td>O(n)</td></tr>
+        <tr><td>끝에 추가</td><td>상환 O(1)</td><td>O(1) (tail 포인터)</td></tr>
+        <tr><td>중간 삽입/삭제</td><td>O(n) (뒤로 밀기)</td><td>O(1) (위치를 알 때) + 찾기 O(n)</td></tr>
+        <tr><td>메모리</td><td>연속, 캐시 친화적</td><td>흩어짐, 포인터 오버헤드</td></tr>
+      </table></div>
+      <p>현대 CPU에서는 <b>배열이 거의 항상 이겨요</b>. 연속 메모리라 캐시와 TLB(OS 챕터 19장)에 유리해요. 연결 리스트의 "O(1) 삽입"은 삽입 위치까지 가는 O(n)이 숨어 있어요. Java <code>LinkedList</code>를 쓸 이유는 거의 없고 <code>ArrayList</code>나 <code>ArrayDeque</code>를 쓰세요.</p>
+
+      <h3>동적 배열의 리사이징</h3>
+      <p>꽉 차면 2배(Java는 1.5배) 크기의 새 배열에 복사. 복사는 O(n)이지만 드물어서 상환 O(1). 크기를 미리 알면 <code>new ArrayList&lt;&gt;(capacity)</code>로 복사를 피해요.</p>
+
+      <h3>스택과 큐</h3>
+      <ul>
+        <li><b>스택</b>(LIFO): 함수 호출, 괄호 검사, 되돌리기(undo), DFS. 배열로 구현.</li>
+        <li><b>큐</b>(FIFO): 작업 대기열, BFS, 버퍼. 원형 배열(ring buffer)이나 연결 리스트. Java는 <code>ArrayDeque</code>.</li>
+        <li><b>덱</b>: 양쪽 삽입·삭제. 슬라이딩 윈도우 최댓값.</li>
+        <li><b>우선순위 큐</b>: 가장 작은(큰) 것 먼저. 힙으로 구현(5장).</li>
+      </ul>
+
+      <h3>링 버퍼</h3>
+      <p>고정 크기 배열을 원형으로 쓰는 큐. head/tail 인덱스만 움직여서 할당이 없어요. 로그 버퍼, 네트워크 소켓 버퍼, Disruptor(LMAX), Kafka 프로듀서 배치가 이 구조예요. 꽉 차면 "덮어쓰기" 또는 "블록" 정책을 정해야 해요.</p>
+
+      <div class="backend"><b>백엔드에서는</b> 스레드풀의 작업 큐가 <code>LinkedBlockingQueue</code>(무제한)인지 <code>ArrayBlockingQueue</code>(유한)인지가 장애 양상을 결정해요. 무제한이면 요청이 쌓여 메모리 OOM, 유한이면 넘칠 때 거부 정책(<code>RejectedExecutionHandler</code>)이 실행돼요. 유한 + 빠른 거부가 보통 더 건강해요(backpressure). Kafka 컨슈머의 폴링, Redis의 <code>LPUSH/BRPOP</code> 큐도 같은 FIFO예요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>배열이 캐시 친화적이라 대부분 이김. LinkedList는 거의 안 씀</li><li>동적 배열 리사이징은 상환 O(1), 용량 미리 지정</li><li>스택 = DFS/호출, 큐 = BFS/작업, 링 버퍼 = 고정 크기 무할당 큐</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>ArrayList 중간 삭제가 O(n)인데도 LinkedList보다 빠른 경우가 많은 이유는?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p>ArrayList의 O(n)은 연속 메모리를 한 블록 옮기는 <code>System.arraycopy</code>라 매우 빠르고 캐시에 유리해요. LinkedList는 삭제 위치까지 포인터를 따라가며 O(n)만큼 캐시 미스를 내고, 노드마다 객체 할당과 GC 부담이 있어요. 수만 개 이하에선 ArrayList가 거의 항상 빨라요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <!-- ================================================================ -->
+    <div class="part-title">2부 해시</div>
+
+    <section id="d03" data-sec>
+      <h2>3장 해시 테이블</h2>
+      <p class="lead">O(1) 조회의 원리, 충돌, 리사이징, 그리고 해시 함수의 품질</p>
+
+      <h3>원리</h3>
+      <p>키를 <b>해시 함수</b>로 정수로 바꾸고, 버킷 배열 크기로 나눈 나머지를 인덱스로 써요. 좋은 해시 함수는 키를 버킷에 고르게 흩뿌려요. 평균 O(1) 조회·삽입·삭제.</p>
+
+      <h3>충돌 해결</h3>
+      <ul>
+        <li><b>체이닝</b>: 버킷마다 연결 리스트. 충돌하면 리스트에 추가. Java <code>HashMap</code>이 이 방식이고, 한 버킷이 8개를 넘으면 Red-Black 트리로 바꿔 최악 O(log n)을 보장해요(해시 충돌 DoS 방어).</li>
+        <li><b>오픈 어드레싱</b>: 충돌하면 다음 빈 칸을 찾아 넣음(선형 탐사, 이차 탐사, 더블 해싱). 포인터가 없어 캐시 친화적. Python <code>dict</code>, Go <code>map</code>, Rust <code>HashMap</code>. 삭제가 까다로워요(tombstone).</li>
+      </ul>
+
+      <h3>로드 팩터와 리사이징</h3>
+      <p>원소 수 / 버킷 수 = 로드 팩터. 높으면 충돌이 늘어요. Java는 0.75를 넘으면 버킷을 2배로 늘리고 <b>전부 재배치(rehash)</b>해요. O(n)이지만 드물어서 상환 O(1). 크기를 알면 초기 용량을 지정하세요. 대량 삽입 중 리사이징이 반복되면 눈에 띄게 느려요.</p>
+
+      <h3>해시 함수의 조건</h3>
+      <ul>
+        <li>같은 키 → 같은 해시 (결정적). <code>equals</code>가 같으면 <code>hashCode</code>도 같아야 함. Java에서 <code>equals</code>만 오버라이드하면 HashMap이 깨져요.</li>
+        <li>고르게 분포. 나쁜 해시(예: 문자열 길이)는 전부 한 버킷에 → O(n).</li>
+        <li>빠름. 암호학적 해시(SHA-256)는 해시 테이블엔 과해요.</li>
+      </ul>
+
+      <h3>순서</h3>
+      <p>해시 테이블은 순서가 없어요. 삽입 순서가 필요하면 <code>LinkedHashMap</code>(해시 + 이중 연결 리스트), 정렬 순서가 필요하면 <code>TreeMap</code>(Red-Black 트리, O(log n)).</p>
+
+      <div class="backend"><b>백엔드에서는</b> JPA 엔티티를 <code>HashSet</code>에 넣을 때 <code>equals/hashCode</code>를 PK 기준으로 오버라이드하는데, PK가 저장 전엔 null이라 해시가 바뀌어 Set에서 사라지는 버그가 있어요. 또 <code>HashMap</code>은 스레드 안전하지 않아서 멀티스레드에서 리사이징 중 접근하면 무한 루프(Java 7) 또는 데이터 유실이 나요. 공유하면 <code>ConcurrentHashMap</code>. 그리고 DB의 해시 조인, 해시 인덱스, Redis의 Hash 타입, 세션 저장소 전부 이 구조예요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>해시 함수 → 버킷, 충돌은 체이닝 또는 오픈 어드레싱</li><li>로드 팩터 초과 시 리사이징(O(n)), 초기 용량 지정</li><li>equals ↔ hashCode 계약, 멀티스레드는 ConcurrentHashMap</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>해시 테이블의 최악 복잡도가 O(n)인 상황과 Java HashMap이 이를 완화하는 방법은?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p>모든 키가 같은 버킷에 떨어질 때(나쁜 해시 함수, 또는 공격자가 해시 충돌 키를 의도적으로 보내는 HashDoS). Java 8+는 한 버킷의 체인이 8개를 넘으면 Red-Black 트리로 변환해 최악을 O(log n)으로 낮춰요. 추가로 문자열 해시에 랜덤 시드를 쓰는 언어도 있어요(Python, Ruby).</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <section id="d04" data-sec>
+      <h2>4장 분산 해싱 — Consistent Hashing과 Bloom Filter</h2>
+      <p class="lead">해시를 여러 서버에 걸쳐 쓰는 법, 그리고 확률적 자료구조</p>
+
+      <h3>문제: hash(key) % N</h3>
+      <p>캐시 서버 N대에 키를 분배할 때 <code>hash(key) % N</code>을 쓰면, 서버가 4 → 5대가 되는 순간 <b>거의 모든 키의 담당 서버가 바뀌어요</b>. 캐시가 통째로 미스 나서 DB가 죽어요.</p>
+
+      <h3>Consistent Hashing</h3>
+      <p>서버와 키를 모두 같은 해시 공간(0 ~ 2³²을 원형 링으로)에 배치해요. 키는 링에서 <b>시계 방향으로 처음 만나는 서버</b>가 담당해요. 서버를 추가하면 그 서버와 바로 앞 서버 사이의 키만 이동(평균 1/N). 제거해도 그 서버의 키만 다음 서버로.</p>
+      <figure class="diagram">
+        <svg viewBox="0 0 640 290" role="img" aria-label="Consistent hashing 링">
+          <circle cx="170" cy="150" r="100" class="dg-plain" style="stroke:var(--border);stroke-width:2"/>
+          <path d="M105.7 73.4 A100 100 0 0 1 152.6 51.5" class="dg-la"/><text x="112" y="44" class="dg-ta">시계 방향</text>
+          <circle cx="204.2" cy="56" r="13" class="dg-box"/><text x="204.2" y="60" text-anchor="middle" class="dg-tb">S1</text>
+          <circle cx="276.6" cy="214.3" r="13" class="dg-box"/><text x="276.6" y="218.3" text-anchor="middle" class="dg-tb">S2</text>
+          <circle cx="106" cy="184.2" r="13" class="dg-box"/><text x="106" y="188.2" text-anchor="middle" class="dg-tb">S3</text>
+          <circle cx="294" cy="115.8" r="13" class="dg-acc" style="stroke-dasharray:4 3"/><text x="294" y="119.8" text-anchor="middle" class="dg-ta">S4</text><text x="312" y="112" class="dg-ta">신규</text>
+          <circle cx="270.7" cy="79.3" r="5" class="dg-ok"/><text x="283" y="76" class="dg-t">k1</text>
+          <circle cx="298.5" cy="167.4" r="5" class="dg-ok"/><text x="309" y="171" class="dg-t">k2</text>
+          <circle cx="165.8" cy="244" r="5" class="dg-ok"/><text x="160" y="266" class="dg-t">k3</text>
+          <circle cx="120" cy="63.4" r="5" class="dg-ok"/><text x="96" y="60" class="dg-t">k4</text>
+          <path d="M275 86 A100 100 0 0 1 287 103" class="dg-lg dg-ld"/>
+          <text x="340" y="60" class="dg-t">키는 시계 방향으로 처음 만나는 서버가 담당</text>
+          <text x="340" y="84" class="dg-tm">k1 → S4 (신규) · k2 → S2 · k3 → S3 · k4 → S1</text>
+          <text x="340" y="122" class="dg-ta">S4 추가 전: k1은 S2 담당</text>
+          <text x="340" y="142" class="dg-ta">S4 추가 후: S1~S4 구간의 키(k1)만 S4로 이동</text>
+          <text x="340" y="166" class="dg-tm">이동량 ≈ 전체의 1/N, 나머지 키는 그대로</text>
+          <text x="340" y="204" class="dg-tw">hash % N 이면 N이 바뀔 때 대부분의 키가 이동</text>
+          <text x="340" y="240" class="dg-tm">실제로는 서버당 가상 노드 100~200개를</text><text x="340" y="256" class="dg-tm">링에 뿌려 구간을 균등하게 만든다</text>
+        </svg>
+        <figcaption>Consistent hashing. 서버 추가·제거 시 인접 구간의 키만 이동한다.</figcaption>
+      </figure>
+      <p>문제: 서버가 적으면 링에서 구간이 불균등해요. 해결은 <b>가상 노드</b>: 서버 하나를 링에 100~200개 점으로 배치해 구간을 고르게 해요. 서버 성능에 따라 가상 노드 수를 다르게 해 가중치도 줄 수 있어요.</p>
+      <p>쓰는 곳: Memcached 클라이언트, DynamoDB, Cassandra, Redis Cluster(슬롯 16384개로 변형), CDN, 로드밸런서의 세션 어피니티.</p>
+
+      <h3>Bloom Filter</h3>
+      <p>"이 원소가 집합에 있는가?"를 <b>아주 적은 메모리</b>로 답하는 확률적 구조. 비트 배열 m개와 해시 함수 k개.</p>
+      <ul>
+        <li>추가: 키를 k개 해시로 돌려 나온 k개 위치의 비트를 1로.</li>
+        <li>질의: k개 위치가 모두 1이면 "아마 있음", 하나라도 0이면 "<b>확실히 없음</b>".</li>
+      </ul>
+      <p><b>거짓 음성은 없고 거짓 양성만 있어요.</b> 1% 오류율에 원소당 약 10비트. 1억 개를 120MB로. 삭제는 못 해요(Counting Bloom Filter는 가능).</p>
+      <p>쓰는 곳: LSM 트리(RocksDB, Cassandra)에서 "이 SSTable에 키가 없다"를 디스크 안 읽고 판단, 캐시 관통 방지(없는 키 요청을 DB 전에 차단), 크롤러의 방문 URL, 추천에서 이미 본 항목 제외.</p>
+
+      <h3>HyperLogLog</h3>
+      <p>유니크 개수(cardinality)를 약 12KB로 0.8% 오차로 세는 구조. Redis <code>PFADD/PFCOUNT</code>. "일간 순 방문자"를 Set으로 세면 수백 MB, HLL이면 12KB.</p>
+
+      <div class="backend"><b>백엔드에서는</b> Redis Cluster는 키를 CRC16 % 16384 슬롯으로 나누고 슬롯을 노드에 배정해요. 노드 추가 시 슬롯 단위로 이동(resharding). 가상 노드의 변형이에요. 캐시 관통(cache penetration) 방어에 Bloom filter를 Redis 앞에 두면(<code>BF.ADD/BF.EXISTS</code>, RedisBloom) 존재하지 않는 ID 공격이 DB까지 안 가요. 다만 "아마 있음"은 확인이 필요하니 캐시 → DB 순서는 유지해요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>% N은 서버 변경 시 전체 재배치, consistent hashing은 1/N만 이동</li><li>가상 노드로 균등화. Redis Cluster 슬롯이 변형</li><li>Bloom filter = 거짓 양성만, 적은 메모리. HLL = 카디널리티 근사</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>Bloom filter가 "있다"고 했는데 실제로 없을 수 있어요. 그래도 캐시 관통 방어에 유용한 이유는?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p>목적은 "없는 키"를 DB 전에 걸러내는 거예요. "확실히 없음"은 100% 정확하니 그 요청은 즉시 거절해요. "아마 있음"(1% 거짓 양성)은 평소처럼 캐시 → DB로 가요. 즉 없는 키 요청의 99%를 DB 접근 없이 막고, 있는 키는 한 번도 잘못 거절하지 않아요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <!-- ================================================================ -->
+    <div class="part-title">3부 트리</div>
+
+    <section id="d05" data-sec>
+      <h2>5장 이진 탐색 트리, 균형 트리, 힙</h2>
+      <p class="lead">정렬을 유지하면서 O(log n)에 넣고 빼고 찾기</p>
+
+      <h3>이진 탐색 트리 (BST)</h3>
+      <p>왼쪽 서브트리 < 노드 < 오른쪽 서브트리. 탐색·삽입·삭제가 높이에 비례. 랜덤 삽입이면 높이 ≈ log n이지만, <b>정렬된 순서로 넣으면 한쪽으로 치우쳐 높이 n</b>(연결 리스트가 됨). 중위 순회하면 정렬된 순서가 나와요.</p>
+
+      <h3>균형 트리</h3>
+      <ul>
+        <li><b>AVL</b>: 좌우 높이 차 ≤ 1 엄격 유지. 탐색이 빠르고 삽입·삭제 시 회전이 많음.</li>
+        <li><b>Red-Black Tree</b>: 느슨한 균형(가장 긴 경로 ≤ 가장 짧은 경로 × 2). 회전이 적어 삽입·삭제가 빠름. Java <code>TreeMap/TreeSet</code>, 리눅스 CFS 스케줄러, HashMap 버킷 트리화, epoll 내부.</li>
+        <li><b>B-Tree / B+Tree</b>: 노드 하나에 키 수백 개, 높이 3~4. 디스크·페이지 기반 저장소용. DB 챕터 8장에서 자세히. 메모리에서도 캐시 라인 활용 때문에 B-Tree 변형이 Red-Black보다 빠른 경우가 많아요(Rust <code>BTreeMap</code>).</li>
+      </ul>
+
+      <h3>힙</h3>
+      <p>부모 ≤ 자식(최소 힙)인 <b>완전 이진 트리</b>. 배열로 구현(i의 자식은 2i+1, 2i+2). 최솟값은 루트 O(1), 삽입은 끝에 넣고 위로 올리기(sift-up) O(log n), 삭제는 루트를 빼고 마지막을 루트로 올려 아래로 내리기(sift-down) O(log n). BST와 달리 <b>정렬된 순회는 못 해요</b>. 오직 최소(최대)만.</p>
+      <figure class="diagram">
+        <svg viewBox="0 0 560 245" role="img" aria-label="최소 힙과 배열 표현">
+          <text x="15" y="20" class="dg-tm">i의 자식 = 2i+1, 2i+2 · 부모 = (i−1)/2</text>
+          <line x1="280" y1="32" x2="180" y2="92" class="dg-plain"/><line x1="280" y1="32" x2="380" y2="92" class="dg-plain"/>
+          <line x1="180" y1="92" x2="130" y2="152" class="dg-plain"/><line x1="180" y1="92" x2="230" y2="152" class="dg-plain"/>
+          <line x1="380" y1="92" x2="330" y2="152" class="dg-plain"/><line x1="380" y1="92" x2="430" y2="152" class="dg-plain"/>
+          <circle cx="280" cy="32" r="16" class="dg-acc"/><text x="280" y="36" text-anchor="middle" class="dg-tb">3</text><text x="302" y="36" class="dg-ta">최솟값 = 루트, O(1)</text>
+          <circle cx="180" cy="92" r="16" class="dg-box"/><text x="180" y="96" text-anchor="middle" class="dg-t">5</text>
+          <circle cx="380" cy="92" r="16" class="dg-box"/><text x="380" y="96" text-anchor="middle" class="dg-t">8</text>
+          <circle cx="130" cy="152" r="16" class="dg-box"/><text x="130" y="156" text-anchor="middle" class="dg-t">9</text>
+          <circle cx="230" cy="152" r="16" class="dg-box"/><text x="230" y="156" text-anchor="middle" class="dg-t">6</text>
+          <circle cx="330" cy="152" r="16" class="dg-box"/><text x="330" y="156" text-anchor="middle" class="dg-t">10</text>
+          <circle cx="430" cy="152" r="16" class="dg-box"/><text x="430" y="156" text-anchor="middle" class="dg-t">12</text>
+          <text x="300" y="25" class="dg-tm">[0]</text><text x="200" y="85" class="dg-tm">[1]</text><text x="400" y="85" class="dg-tm">[2]</text><text x="150" y="145" class="dg-tm">[3]</text><text x="250" y="145" class="dg-tm">[4]</text><text x="350" y="145" class="dg-tm">[5]</text><text x="450" y="145" class="dg-tm">[6]</text>
+          <rect x="105" y="192" width="50" height="30" class="dg-acc"/><text x="130" y="212" text-anchor="middle" class="dg-tb">3</text>
+          <rect x="155" y="192" width="50" height="30" class="dg-box"/><text x="180" y="212" text-anchor="middle" class="dg-t">5</text>
+          <rect x="205" y="192" width="50" height="30" class="dg-box"/><text x="230" y="212" text-anchor="middle" class="dg-t">8</text>
+          <rect x="255" y="192" width="50" height="30" class="dg-box"/><text x="280" y="212" text-anchor="middle" class="dg-t">9</text>
+          <rect x="305" y="192" width="50" height="30" class="dg-box"/><text x="330" y="212" text-anchor="middle" class="dg-t">6</text>
+          <rect x="355" y="192" width="50" height="30" class="dg-box"/><text x="380" y="212" text-anchor="middle" class="dg-t">10</text>
+          <rect x="405" y="192" width="50" height="30" class="dg-box"/><text x="430" y="212" text-anchor="middle" class="dg-t">12</text>
+          <text x="130" y="238" text-anchor="middle" class="dg-tm">0</text><text x="180" y="238" text-anchor="middle" class="dg-tm">1</text><text x="230" y="238" text-anchor="middle" class="dg-tm">2</text><text x="280" y="238" text-anchor="middle" class="dg-tm">3</text><text x="330" y="238" text-anchor="middle" class="dg-tm">4</text><text x="380" y="238" text-anchor="middle" class="dg-tm">5</text><text x="430" y="238" text-anchor="middle" class="dg-tm">6</text>
+          <text x="470" y="212" class="dg-tm">← 배열 하나로 표현</text>
+        </svg>
+        <figcaption>완전 이진 트리라 포인터 없이 배열 인덱스 계산만으로 부모·자식을 찾는다.</figcaption>
+      </figure>
+      <p>쓰는 곳: 우선순위 큐, 다익스트라, 타이머(가장 빠른 만료 시각), 작업 스케줄러, "상위 K개"(크기 K 최소 힙 유지 → O(n log K)), 여러 정렬된 스트림 병합(K-way merge, LSM 컴팩션).</p>
+
+      <h3>트라이 (Trie)</h3>
+      <p>문자열을 글자 단위 경로로 저장. 접두사 검색 O(문자열 길이). 자동완성, IP 라우팅 테이블(최장 접두사 일치), 사전. 메모리를 많이 써서 압축 트라이(radix tree)를 써요. Nginx 라우팅, Go <code>httprouter</code>가 radix tree.</p>
+
+      <h3>스킵 리스트</h3>
+      <p>정렬된 연결 리스트 위에 "급행" 층을 확률적으로 쌓은 구조. 위층에서 크게 건너뛰다 내려와서 O(log n). 균형 트리와 성능은 비슷한데 구현이 훨씬 단순하고 락 없는 동시성 구현이 쉬워요. <b>Redis Sorted Set</b>, Java <code>ConcurrentSkipListMap</code>, LevelDB/RocksDB 메모리 테이블(memtable).</p>
+
+      <div class="backend"><b>백엔드에서는</b> "최근 N분 안에 만료되는 것" 같은 타이머는 힙(<code>PriorityQueue</code>, <code>ScheduledThreadPoolExecutor</code> 내부)이고, Netty는 더 싼 타이밍 휠을 써요. 랭킹은 Redis Sorted Set(<code>ZADD/ZRANGE</code>, 스킵 리스트)이 O(log n)이라 DB <code>ORDER BY score</code>보다 훨씬 빨라요. 라우터가 URL 경로를 매칭하는 것도 트라이예요. 정렬된 범위 조회가 필요한 메모리 구조는 <code>TreeMap</code>(<code>subMap</code>, <code>ceilingKey</code>)이에요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>BST는 치우침 문제 → Red-Black(메모리), B-Tree(디스크)</li><li>힙 = 최소/최대만 O(1), 삽입·삭제 O(log n), 배열 구현</li><li>트라이 = 접두사, 스킵 리스트 = 단순한 정렬 구조(Redis ZSET)</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>1억 개 로그 중 응답 시간 상위 100개를 메모리 적게 쓰면서 구하는 방법은?</li><li>Redis가 Sorted Set에 Red-Black 트리 대신 스킵 리스트를 쓴 이유는?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p><b>1.</b> 크기 100의 <b>최소 힙</b>을 유지해요. 각 로그를 보며 힙 크기가 100 미만이면 넣고, 아니면 힙의 최솟값(100개 중 가장 작은 것)보다 크면 최솟값을 빼고 넣어요. O(n log 100), 메모리 100개. 전체 정렬(O(n log n), 메모리 n)보다 훨씬 효율적이에요.</p>
+          <p><b>2.</b> Redis 작성자의 설명: 구현이 단순하고, 범위 조회(ZRANGE)를 위한 연결 리스트 순회가 자연스럽고, 메모리 사용을 조절할 수 있어요(층 확률). 성능은 균형 트리와 동급이에요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <!-- ================================================================ -->
+    <div class="part-title">4부 그래프</div>
+
+    <section id="d06" data-sec>
+      <h2>6장 그래프 — 표현, BFS/DFS, 최단 경로, 위상 정렬</h2>
+      <p class="lead">관계를 다루는 구조. 의존성, 네트워크, 추천, 소셜</p>
+
+      <h3>표현</h3>
+      <ul>
+        <li><b>인접 리스트</b>: 노드마다 이웃 목록. 메모리 O(V+E). 희소 그래프(대부분)에 적합. <code>Map&lt;Node, List&lt;Node&gt;&gt;</code>.</li>
+        <li><b>인접 행렬</b>: V×V 배열. 간선 존재 확인 O(1). 밀집 그래프나 V가 작을 때.</li>
+      </ul>
+
+      <h3>BFS (너비 우선)</h3>
+      <p>큐를 써서 가까운 노드부터. 시작점에서 각 노드까지 <b>최단 거리(간선 수 기준)</b>를 구해요. O(V+E). 방문 체크 필수(사이클). 쓰는 곳: 최단 경로(가중치 없음), 소셜 "n촌" 관계, 크롤러, 레벨 순회.</p>
+
+      <h3>DFS (깊이 우선)</h3>
+      <p>스택(또는 재귀)으로 한 방향 끝까지. O(V+E). 쓰는 곳: 사이클 탐지, 연결 요소, 경로 존재 여부, 위상 정렬, 백트래킹. 재귀 깊이 주의(명시적 스택으로).</p>
+
+      <h3>위상 정렬</h3>
+      <p>방향 비순환 그래프(DAG)에서 "A가 B보다 먼저"를 만족하는 순서. 진입 차수가 0인 노드부터 큐로(Kahn), 또는 DFS 종료 순서의 역. 사이클이 있으면 불가능 → 순환 의존성 탐지. 쓰는 곳: 빌드 순서, 패키지 설치, 스프링 빈 초기화 순서, 워크플로/DAG 스케줄러(Airflow), 마이그레이션 순서.</p>
+
+      <h3>다익스트라 (가중치 최단 경로)</h3>
+      <p>시작점에서 거리가 가장 짧은 미방문 노드를 <b>우선순위 큐(힙)</b>로 꺼내 이웃 거리를 갱신. O((V+E) log V). 음수 가중치 불가(벨만-포드). 쓰는 곳: 지도, 네트워크 라우팅(OSPF가 다익스트라), 비용 최소 경로.</p>
+
+      <h3>유니온 파인드 (Disjoint Set)</h3>
+      <p>"같은 집합인가?"와 "합치기"를 거의 O(1)(역 아커만 함수)에. 경로 압축 + 랭크. 쓰는 곳: 연결 요소 동적 관리, 크루스칼 MST, 중복 계정 병합, 네트워크 연결 여부.</p>
+
+      <div class="backend"><b>백엔드에서는</b> 스프링이 빈 의존성 그래프에서 순환 참조를 탐지하는 것, 마이크로서비스 호출 그래프에서 분산 트레이싱이 경로를 재구성하는 것, 권한 상속(역할 → 역할), 조직도, 카테고리 트리, 추천의 "함께 구매" 그래프, DB의 외래키 의존성 순서로 테이블 삭제하기 전부 그래프 문제예요. 깊은 트리를 재귀 쿼리로 가져오는 건 <code>WITH RECURSIVE</code>(MySQL 8.0)가 BFS를 DB에서 해주는 거예요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>인접 리스트가 기본. BFS = 큐·최단 거리, DFS = 스택·사이클·경로</li><li>위상 정렬 = DAG의 순서, 사이클이면 불가</li><li>다익스트라 = 힙으로 가중치 최단 경로</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>마이크로서비스 배포 순서를 의존성에 따라 정하고, 순환 의존을 탐지하려면?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p>서비스를 노드, "A가 B를 호출"을 A→B 간선으로 그래프를 만들고 위상 정렬. Kahn 알고리즘으로 진입 차수 0인 것부터 꺼내 큐에 넣고, 끝났는데 처리 안 된 노드가 남으면 그 노드들이 사이클이에요. 배포 순서는 위상 순서의 역(의존당하는 것 먼저).</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <!-- ================================================================ -->
+    <div class="part-title">5부 알고리즘 기법</div>
+
+    <section id="d07" data-sec>
+      <h2>7장 정렬과 탐색</h2>
+      <p class="lead">비교 정렬의 한계, 안정성, 이진 탐색의 변형들</p>
+
+      <h3>정렬</h3>
+      <div class="tbl"><table>
+        <tr><th>알고리즘</th><th>평균</th><th>최악</th><th>공간</th><th>안정</th><th>비고</th></tr>
+        <tr><td>퀵 정렬</td><td>n log n</td><td>n²</td><td>log n</td><td>X</td><td>캐시 친화적, 실제로 가장 빠름. 피벗 랜덤화로 최악 회피</td></tr>
+        <tr><td>병합 정렬</td><td>n log n</td><td>n log n</td><td>n</td><td>O</td><td>외부 정렬(디스크), 연결 리스트</td></tr>
+        <tr><td>힙 정렬</td><td>n log n</td><td>n log n</td><td>1</td><td>X</td><td>메모리 제약 시</td></tr>
+        <tr><td>팀소트</td><td>n log n</td><td>n log n</td><td>n</td><td>O</td><td>병합+삽입, 부분 정렬된 데이터에 강함. Java 객체 정렬, Python</td></tr>
+        <tr><td>삽입 정렬</td><td>n²</td><td>n²</td><td>1</td><td>O</td><td>작은 n(~16)에서 가장 빠름, 거의 정렬된 데이터</td></tr>
+        <tr><td>계수/기수 정렬</td><td>n+k</td><td>n+k</td><td>n+k</td><td>O</td><td>정수·고정 길이 키. 비교 안 함</td></tr>
+      </table></div>
+      <p><b>비교 정렬의 하한은 O(n log n)</b>이에요. 더 빠르려면 비교를 안 해야 해요(기수 정렬). <b>안정 정렬</b>은 같은 키의 원래 순서를 유지해요. "이름순 정렬 후 부서순 정렬"이 부서 안에서 이름순을 유지하려면 안정 정렬이어야 해요.</p>
+
+      <h3>외부 정렬</h3>
+      <p>메모리보다 큰 데이터: 메모리 크기만큼 잘라 정렬해 파일로 쓰고(run), 그 파일들을 K-way 병합(힙). DB의 filesort(DB 챕터 9장)가 정확히 이거예요. <code>sort_buffer_size</code>가 run 크기.</p>
+
+      <h3>이진 탐색</h3>
+      <p>정렬된 배열에서 O(log n). 구현이 쉬워 보이지만 off-by-one이 많아요. 변형이 중요해요.</p>
+      <ul>
+        <li><b>lower_bound</b>: x 이상인 첫 위치. <b>upper_bound</b>: x 초과인 첫 위치. 둘의 차가 x의 개수.</li>
+        <li><b>답을 이진 탐색</b>(parametric search): "조건을 만족하는 최소 값"을 찾을 때 값의 범위를 이진 탐색. "서버 N대로 처리 가능한가?"가 단조이면 최소 N을 log번 확인으로.</li>
+      </ul>
+      <p>DB B-Tree의 페이지 안에서 키를 찾는 것, 타임스탬프 정렬 로그에서 시간 범위 찾기, 버전 배열에서 "이 커밋이 포함된 첫 버전"(git bisect)이 이진 탐색이에요.</p>
+
+      <h3>투 포인터, 슬라이딩 윈도우</h3>
+      <p>정렬된 두 배열의 병합·교집합, 연속 구간의 합/최대 등을 O(n)에. "최근 1분 요청 수"를 큐로 유지하는 슬라이딩 윈도우 rate limiter가 이 기법이에요.</p>
+
+      <div class="backend"><b>백엔드에서는</b> Java <code>Collections.sort</code>(객체)는 팀소트(안정), <code>Arrays.sort(int[])</code>는 듀얼 피벗 퀵소트(불안정). 정렬 키가 같은 항목의 순서가 중요하면 compareTo에 두 번째 키를 넣어 명시하세요. "DB에서 정렬 vs 애플리케이션에서 정렬": DB가 인덱스로 할 수 있으면 DB, 아니면 데이터가 작을 때 애플리케이션. 수십만 건을 가져와 정렬하는 건 네트워크와 메모리 낭비예요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>비교 정렬 하한 n log n, 실무는 팀소트(안정)·퀵소트</li><li>외부 정렬 = run + K-way 병합 = DB filesort</li><li>이진 탐색은 lower/upper bound와 "답 찾기" 변형이 핵심</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>정렬된 타임스탬프 배열에서 [t1, t2] 구간의 이벤트 수를 O(log n)에 구하려면?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p><code>upper_bound(t2) - lower_bound(t1)</code>. lower_bound(t1)은 t1 이상인 첫 인덱스, upper_bound(t2)는 t2 초과인 첫 인덱스. 둘 다 이진 탐색 O(log n).</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <section id="d08" data-sec>
+      <h2>8장 재귀, 분할 정복, 동적 계획법, 그리디</h2>
+      <p class="lead">문제를 작게 쪼개는 네 가지 사고방식</p>
+
+      <h3>재귀</h3>
+      <p>함수가 자기를 호출. <b>기저 조건</b>(멈추는 조건)과 <b>재귀 조건</b>(문제를 작게). 트리·그래프 순회, 디렉터리 탐색, JSON 파싱, 조합 생성에 자연스러워요. 깊이가 깊으면(1만 이상) 스택 오버플로 → 반복 + 명시적 스택.</p>
+
+      <h3>분할 정복</h3>
+      <p>문제를 독립된 부분 문제로 나눠 각각 풀고 합침. 병합 정렬, 퀵 정렬, 이진 탐색, 큰 수 곱셈(카라츠바). <b>부분 문제가 겹치지 않을 때</b>. MapReduce가 분할 정복의 분산 버전이에요(분산 시스템 챕터 10장).</p>
+
+      <h3>동적 계획법 (DP)</h3>
+      <p><b>부분 문제가 겹칠 때</b> 결과를 저장(메모이제이션)해 다시 안 풀기. 피보나치를 순진하게 재귀하면 O(2ⁿ), 저장하면 O(n). 조건: (1) 최적 부분 구조(큰 문제의 최적해가 작은 문제의 최적해로 구성), (2) 중복 부분 문제.</p>
+      <ul>
+        <li><b>Top-down</b>: 재귀 + 캐시(Map/배열). 직관적.</li>
+        <li><b>Bottom-up</b>: 작은 것부터 표를 채움. 스택 안 씀, 빠름.</li>
+      </ul>
+      <p>대표 문제: 배낭 문제, 최장 공통 부분 수열(LCS, diff 알고리즘), 편집 거리(오타 교정, 유사도), 경로 수, 동전 거스름돈. 핵심은 <b>상태를 정의</b>하는 것: "dp[i][j] = i번째까지 고려하고 용량 j일 때 최대 가치".</p>
+
+      <h3>그리디</h3>
+      <p>매 단계 지금 가장 좋아 보이는 선택. 빠르지만 <b>항상 최적은 아님</b>. 최적이 보장되는 경우: 활동 선택(가장 빨리 끝나는 것부터), 허프만 코딩, 다익스트라, 크루스칼/프림(MST), 동전이 배수 관계일 때 거스름돈. 보장 안 되는 경우는 DP나 탐색. 증명이 어려우면 "반례가 있나?"를 먼저 찾으세요.</p>
+
+      <h3>백트래킹</h3>
+      <p>모든 경우를 DFS로 탐색하되 <b>가망 없는 가지를 일찍 자름</b>(가지치기). N-Queen, 스도쿠, 조합 최적화. 지수 시간이지만 가지치기로 실용적.</p>
+
+      <div class="backend"><b>백엔드에서는</b> DP는 직접 쓸 일이 드물지만 "메모이제이션"은 매일 써요. 캐시가 곧 메모이제이션이에요(같은 입력 → 저장된 출력). 비싼 계산 결과를 <code>@Cacheable</code>로 저장하는 것, 재귀적 권한 계산 결과를 요청 범위에서 캐시하는 것. 그리디는 "지금 가장 여유 있는 서버에 보내기"(least connections), "가장 빨리 끝날 작업부터"(SJF 스케줄링) 같은 휴리스틱으로 자주 쓰고, 전역 최적이 아님을 인지하면 돼요. 편집 거리는 검색 오타 교정, LCS는 텍스트 diff·버전 비교에 들어가요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>분할 정복 = 독립 부분 문제, DP = 겹치는 부분 문제 + 저장</li><li>DP 핵심 = 상태 정의. 캐시 = 메모이제이션</li><li>그리디 = 빠르지만 최적 보장은 증명 필요, 반례부터</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>분할 정복과 DP의 차이를 한 문장으로.</li><li>동전 {1, 3, 4}로 6원을 거슬러 줄 때 그리디가 실패하는 이유는?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p><b>1.</b> 둘 다 문제를 쪼개지만, 분할 정복은 부분 문제가 독립이라 각각 풀고, DP는 부분 문제가 겹쳐서 결과를 저장해 재사용해요.</p>
+          <p><b>2.</b> 그리디는 4 → 1 → 1로 3개. 최적은 3 + 3으로 2개. 동전이 배수 관계가 아니면 "지금 가장 큰 동전"이 전역 최적을 보장하지 않아요. DP로 dp[금액] = min(dp[금액 − 동전] + 1).</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <!-- ================================================================ -->
+    <div class="part-title">6부 실무 자료구조</div>
+
+    <section id="d09" data-sec>
+      <h2>9장 캐시 교체와 레이트 리미터</h2>
+      <p class="lead">LRU/LFU 구현, 토큰 버킷, 슬라이딩 윈도우 — 직접 구현해 볼 가치가 있는 것들</p>
+
+      <h3>LRU 캐시</h3>
+      <p>가장 오래 안 쓴 것을 버림. <b>HashMap + 이중 연결 리스트</b>로 get/put 모두 O(1).</p>
+      <ul>
+        <li>HashMap: 키 → 리스트 노드. 바로 찾기.</li>
+        <li>이중 연결 리스트: 사용 순서. get/put하면 노드를 맨 앞으로 옮기고(O(1), 양쪽 포인터 있으니까), 꽉 차면 맨 뒤를 제거.</li>
+      </ul>
+      <figure class="diagram">
+        <svg viewBox="0 0 640 205" role="img" aria-label="LRU 캐시 구조">
+          <rect x="20" y="30" width="150" height="130" rx="8" class="dg-box"/><text x="95" y="52" text-anchor="middle" class="dg-tb">HashMap</text>
+          <text x="40" y="80" class="dg-t">A → 노드</text><text x="40" y="110" class="dg-t">B → 노드</text><text x="40" y="140" class="dg-t">C → 노드</text>
+          <text x="320" y="45" text-anchor="middle" class="dg-tg">최근 사용 (앞)</text><text x="490" y="45" text-anchor="middle" class="dg-tw">제거 대상 (뒤)</text>
+          <rect x="200" y="55" width="70" height="40" rx="6" class="dg-soft"/><text x="235" y="80" text-anchor="middle" class="dg-tm">head</text>
+          <rect x="285" y="55" width="70" height="40" rx="6" class="dg-acc"/><text x="320" y="80" text-anchor="middle" class="dg-tb">C</text>
+          <rect x="370" y="55" width="70" height="40" rx="6" class="dg-box"/><text x="405" y="80" text-anchor="middle" class="dg-t">A</text>
+          <rect x="455" y="55" width="70" height="40" rx="6" class="dg-box"/><text x="490" y="80" text-anchor="middle" class="dg-t">B</text>
+          <rect x="540" y="55" width="70" height="40" rx="6" class="dg-soft"/><text x="575" y="80" text-anchor="middle" class="dg-tm">tail</text>
+          <path d="M270 68 L283 68" class="dg-l"/><path d="M285 82 L272 82" class="dg-l"/>
+          <path d="M355 68 L368 68" class="dg-l"/><path d="M370 82 L357 82" class="dg-l"/>
+          <path d="M440 68 L453 68" class="dg-l"/><path d="M455 82 L442 82" class="dg-l"/>
+          <path d="M525 68 L538 68" class="dg-l"/><path d="M540 82 L527 82" class="dg-l"/>
+          <path d="M150 76 L405 97" class="dg-lm dg-ld"/><path d="M150 106 L490 97" class="dg-lm dg-ld"/><path d="M150 136 L320 97" class="dg-lm dg-ld"/>
+          <text x="20" y="182" class="dg-t">get(A): HashMap으로 노드 찾기 O(1) → 리스트에서 떼어 head 뒤로 O(1)</text>
+          <text x="20" y="199" class="dg-tm">put 시 꽉 차면 tail 앞 노드(B)를 제거하고 HashMap에서도 삭제. 모든 연산 O(1).</text>
+        </svg>
+        <figcaption>HashMap이 "어디 있나"를, 이중 연결 리스트가 "얼마나 최근인가"를 담당한다.</figcaption>
+      </figure>
+      <p>Java: <code>new LinkedHashMap&lt;&gt;(cap, 0.75f, true)</code> + <code>removeEldestEntry</code> 오버라이드. 정확한 LRU는 접근마다 리스트 갱신이 필요해서 동시성이 높으면 락 경합이 커요. 그래서 Redis는 샘플링 근사 LRU(OS 챕터 22장 Clock과 같은 이유), Caffeine은 Window TinyLFU를 써요.</p>
+
+      <h3>LFU</h3>
+      <p>가장 적게 쓴 것을 버림. 빈도별 리스트 + HashMap으로 O(1) 구현 가능. 오래된 인기 항목이 안 빠지는 문제(cache pollution)가 있어 시간 감쇠를 넣어요. Redis <code>allkeys-lfu</code>는 로그 카운터 + 감쇠.</p>
+
+      <h3>레이트 리미터</h3>
+      <div class="tbl"><table>
+        <tr><th>알고리즘</th><th>동작</th><th>특징</th></tr>
+        <tr><td>고정 윈도우</td><td>1분 단위로 카운트</td><td>단순. 경계에서 2배 허용(59초에 100, 61초에 100)</td></tr>
+        <tr><td>슬라이딩 로그</td><td>요청 타임스탬프를 전부 저장, 최근 1분 것만 세기</td><td>정확, 메모리 큼</td></tr>
+        <tr><td>슬라이딩 윈도우 카운터</td><td>이전 윈도우 카운트 × 겹친 비율 + 현재 카운트</td><td>근사, 메모리 작음. 실무 표준</td></tr>
+        <tr><td><b>토큰 버킷</b></td><td>초당 r개 토큰 보충, 최대 b개. 요청마다 토큰 1개 소비</td><td>순간 burst(b개) 허용, 평균 r/초. AWS API, Nginx <code>limit_req</code>(burst)</td></tr>
+        <tr><td>리키 버킷</td><td>큐에 넣고 일정 속도로 처리</td><td>출력이 균일. burst 흡수가 아니라 평탄화</td></tr>
+      </table></div>
+      <p>토큰 버킷 구현: 마지막 보충 시각과 토큰 수만 저장. 요청 시 <code>tokens = min(b, tokens + (now − last) × r)</code>로 지연 계산. 저장 공간 O(1). 분산 환경이면 Redis에 Lua 스크립트로 원자적 실행.</p>
+
+      <h3>타이밍 휠</h3>
+      <p>타이머가 수십만 개일 때 힙(O(log n))도 부담. 시계처럼 슬롯 배열을 돌며 각 슬롯의 리스트를 처리. 삽입·삭제 O(1). Netty, Kafka(지연 작업), 커널 타이머.</p>
+
+      <div class="backend"><b>백엔드에서는</b> 로컬 캐시는 Caffeine(기본 선택), 분산 캐시는 Redis. 레이트 리밋은 게이트웨이(Nginx, Spring Cloud Gateway, Envoy)에서 토큰 버킷으로, 사용자별이면 Redis + Lua. 직접 구현할 일이 있다면 LRU와 토큰 버킷은 각각 30줄 안에 나오니 한 번은 손으로 짜 보세요. 면접 단골이기도 해요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>LRU = HashMap + 이중 연결 리스트, O(1). 실무는 근사 LRU/TinyLFU</li><li>토큰 버킷 = burst 허용 + 평균 제한, O(1) 저장. 슬라이딩 윈도우 카운터 = 경계 문제 완화</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>LRU에서 이중 연결 리스트가 단일 연결 리스트면 안 되는 이유는?</li><li>고정 윈도우의 경계 문제를 설명하고 토큰 버킷이 어떻게 다른지.</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p><b>1.</b> 중간 노드를 맨 앞으로 옮기려면 그 노드의 이전 노드의 next를 바꿔야 해요. 단일 연결이면 이전 노드를 찾으려고 처음부터 순회(O(n)). 이중 연결이면 prev 포인터로 O(1).</p>
+          <p><b>2.</b> 분당 100 제한에서 0:59에 100개, 1:01에 100개면 2초 안에 200개가 통과해요. 토큰 버킷은 시간에 비례해 토큰이 차고(초당 1.67개) 버킷 용량(예: 100)만큼만 burst를 허용해서, 100개를 쓰면 다시 쌓일 때까지 기다려야 해요. 경계가 없어요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <section id="d10" data-sec>
+      <h2>10장 백엔드 시스템 속의 자료구조 지도</h2>
+      <p class="lead">지금까지 배운 것이 실제 어디에 있는지 한눈에</p>
+
+      <h3>저장소</h3>
+      <div class="tbl"><table>
+        <tr><th>시스템</th><th>자료구조</th><th>이유</th></tr>
+        <tr><td>MySQL/PostgreSQL 인덱스</td><td>B+Tree</td><td>디스크 페이지 단위, 범위 검색, 높이 3~4</td></tr>
+        <tr><td>RocksDB, Cassandra, LevelDB</td><td>LSM 트리(memtable=스킵 리스트, SSTable=정렬 파일, Bloom filter)</td><td>쓰기를 순차 I/O로, 읽기는 Bloom filter로 디스크 접근 절감</td></tr>
+        <tr><td>Elasticsearch, Lucene</td><td>역색인(단어 → 문서 목록), FST(트라이 압축)</td><td>전문 검색, 접두사·자동완성</td></tr>
+        <tr><td>Kafka</td><td>append-only 로그 + 오프셋 인덱스(희소 배열)</td><td>순차 쓰기·읽기, 오프셋으로 이진 탐색</td></tr>
+      </table></div>
+
+      <h3>Redis 타입과 내부</h3>
+      <div class="tbl"><table>
+        <tr><th>타입</th><th>내부(크기에 따라 전환)</th><th>대표 용도</th></tr>
+        <tr><td>String</td><td>SDS(동적 문자열)</td><td>캐시, 카운터(INCR), 분산 락(SET NX PX)</td></tr>
+        <tr><td>List</td><td>quicklist(ziplist 연결)</td><td>큐(LPUSH/BRPOP), 최근 N개</td></tr>
+        <tr><td>Hash</td><td>listpack → 해시 테이블</td><td>객체 필드, 세션</td></tr>
+        <tr><td>Set</td><td>intset → 해시 테이블</td><td>태그, 교집합(공통 친구)</td></tr>
+        <tr><td>Sorted Set</td><td>listpack → 스킵 리스트 + 해시</td><td>랭킹, 시간순 타임라인, 지연 큐(score=실행 시각)</td></tr>
+        <tr><td>HyperLogLog</td><td>12KB 레지스터</td><td>순 방문자</td></tr>
+        <tr><td>Bitmap</td><td>비트 배열</td><td>출석 체크, 플래그 (1억 사용자 = 12MB)</td></tr>
+        <tr><td>Stream</td><td>radix tree + listpack</td><td>로그, 이벤트 스트림, 컨슈머 그룹</td></tr>
+      </table></div>
+
+      <h3>런타임과 미들웨어</h3>
+      <ul>
+        <li>JVM GC: 카드 테이블(비트맵), 세대별 영역(배열), 도달 가능성 = 그래프 탐색(BFS/DFS)</li>
+        <li>스레드풀: 블로킹 큐(배열/연결), 스케줄러: 힙 또는 타이밍 휠</li>
+        <li>HTTP 라우터: 트라이/radix tree. 헤더: 해시맵. HTTP/2 HPACK: 동적 테이블(링 버퍼)</li>
+        <li>로드밸런서: consistent hashing, 가중 라운드로빈</li>
+        <li>분산 트레이싱: 스팬 트리(DAG)</li>
+        <li>Raft/ZooKeeper: append-only 로그 + 상태 머신</li>
+        <li>CDN/캐시: LRU 변형, Bloom filter(캐시 승격 결정)</li>
+      </ul>
+
+      <div class="backend"><b>백엔드에서는</b> 새 시스템을 만날 때 "내부 자료구조가 뭐지?"를 물어보면 성능 특성이 보여요. Kafka가 왜 순차 읽기만 빠른지(로그), Redis ZSET이 왜 O(log n)인지(스킵 리스트), Elasticsearch가 왜 쓰기 직후 검색이 안 되는지(세그먼트 refresh), Cassandra가 왜 쓰기는 빠른데 읽기 증폭이 있는지(LSM). 자료구조를 알면 문서의 "제한 사항"이 왜 있는지 납득이 돼요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>디스크 = B+Tree(읽기) 또는 LSM(쓰기), 검색 = 역색인</li><li>Redis 타입마다 내부 구조가 복잡도를 결정</li><li>"내부 자료구조가 뭐지?"가 시스템 이해의 출발점</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>B+Tree 기반 DB와 LSM 기반 DB의 읽기·쓰기 특성 차이를 자료구조로 설명하세요.</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p>B+Tree는 제자리 갱신이라 쓰기가 랜덤 I/O(페이지 찾아서 수정), 읽기는 높이만큼(3~4번)으로 안정적. LSM은 쓰기를 메모리(memtable)에 모아 정렬된 파일(SSTable)로 순차 쓰기라 쓰기 처리량이 높지만, 읽기는 여러 SSTable을 확인해야 해서 읽기 증폭이 있고 Bloom filter로 완화. 백그라운드 컴팩션이 CPU·I/O를 써요. 쓰기 위주(로그, 시계열)는 LSM, 읽기 위주(OLTP)는 B+Tree.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <!-- ================================================================ -->
+    <div class="part-title">실습</div>
+
+    <section id="lab" data-sec>
+      <h2>실습 과제</h2>
+      <p class="lead">직접 구현해 보는 것이 가장 빨라요. 각각 100줄 이내예요.</p>
+      <ul class="lab">
+        <li><b>1~2장</b> 10만 건 리스트에서 루프 안 <code>contains</code>와 HashSet <code>contains</code>의 시간 차이 측정. ArrayList vs LinkedList 중간 삽입·순회 벤치마크</li>
+        <li><b>3장</b> 체이닝 해시 테이블을 직접 구현(put/get/remove, 리사이징 포함). 나쁜 해시 함수를 넣고 성능이 무너지는 것 관찰</li>
+        <li><b>4장</b> 가상 노드 100개짜리 consistent hashing 링 구현. 서버 4 → 5대일 때 이동하는 키 비율 측정(약 20%여야). <code>% N</code>과 비교</li>
+        <li><b>5장</b> 최소 힙 구현(배열). 1억 개 난수 중 상위 100개를 힙으로 구하기 vs 전체 정렬 시간 비교</li>
+        <li><b>6장</b> 서비스 의존성(Map)을 받아 위상 정렬로 배포 순서를 내고, 순환이 있으면 어느 서비스들인지 출력하는 함수</li>
+        <li><b>7장</b> lower_bound / upper_bound를 직접 구현하고 경계 케이스(없는 값, 첫/마지막, 중복) 테스트</li>
+        <li><b>9장</b> LRU 캐시(HashMap + 이중 연결 리스트) 구현. 토큰 버킷 레이트 리미터 구현 후 멀티스레드로 때려서 초당 허용 수 확인</li>
+        <li><b>상시</b> 하루 1문제, 30일. 각 문제를 "어떤 자료구조를 왜 썼는지" 한 줄로 기록</li>
+      </ul>
+      <label class="done"><input type="checkbox"> 실습 완료</label>
+    </section>
+
+    <div class="pager">
+      <a href="03-database.html"><small>이전</small>← 3. 데이터베이스</a>
+      <a class="next" href="05-distributed.html"><small>다음</small>5. 분산 시스템과 설계 →</a>
+    </div>
+  </main>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

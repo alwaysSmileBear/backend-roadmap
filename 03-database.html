@@ -1,0 +1,1038 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3. 데이터베이스 — 백엔드 기본기</title>
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("roadmap:theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body data-chapter="database">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text)"/></marker>
+<marker id="arra" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+<marker id="arrm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--muted)"/></marker>
+<marker id="arrw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--warn)"/></marker>
+<marker id="arrg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--done)"/></marker>
+</defs></svg><div class="layout">
+  <nav class="side">
+    <a class="home" href="index.html">← 로드맵 홈</a>
+    <h1>3. 데이터베이스</h1>
+    <p class="sub">Real MySQL 8.0 목차 기준 · 6~8주</p>
+    <div class="progress">
+      진행률 <b id="pct">0%</b>
+      <div class="bar"><span id="bar"></span></div>
+      <div class="tools">
+        <button data-act="open">답 모두 열기</button>
+        <button data-act="close">답 모두 닫기</button>
+        <button data-act="reset">초기화</button>
+        <button class="theme-btn" type="button">테마: 시스템</button>
+      </div>
+    </div>
+    <ol id="toc"></ol>
+  </nav>
+
+  <main>
+    <header class="chap-head">
+      <h1>데이터베이스</h1>
+      <p class="meta">기준 교재: Real MySQL 8.0 (백은빈·이성욱) 1권·2권 · 6~8주 · 가장 중요한 챕터</p>
+      <p>『Real MySQL 8.0』은 MySQL 내부 구조부터 쿼리 튜닝, 복제까지 실무 관점으로 다루는 국내 표준 교재예요. 이 페이지는 1권의 <b>4장(아키텍처) → 5장(트랜잭션과 잠금) → 8장(인덱스) → 9장(옵티마이저) → 10장(실행 계획) → 11장(쿼리 최적화) → 13장(파티션)</b>, 2권의 <b>15장(데이터 타입) → 16장(복제)</b> 순서를 따라요. 교재에 없는 관계형 모델링 기초는 0장으로 앞에 붙였어요.</p>
+      <p>PostgreSQL을 쓰더라도 B-Tree, MVCC, 격리 수준, 실행 계획의 원리는 같아요. 다른 부분은 각 장에 표시했어요.</p>
+      <div class="books">
+        <div class="book"><b>Real MySQL 8.0 1권 <span class="tag must">기준 교재</span></b><span>4·5·8·9·10·11장이 핵심</span></div>
+        <div class="book"><b>Real MySQL 8.0 2권</b><span>15장 데이터 타입, 16장 복제</span></div>
+        <div class="book"><b>Use The Index, Luke <span class="tag easy">무료 웹</span></b><span>인덱스만 깊게, DB 무관</span></div>
+        <div class="book"><b>데이터베이스 인터널스 <span class="tag deep">심화</span></b><span>스토리지 엔진과 분산 DB 내부</span></div>
+      </div>
+    </header>
+
+    <!-- ================================================================ -->
+    <div class="part-title">0장 관계형 모델링 기초 (교재 외)</div>
+
+    <section id="ch00" data-sec>
+      <h2>0장 정규화와 키 설계</h2>
+      <p class="lead">테이블을 어떻게 나누고 무엇을 키로 삼을까</p>
+
+      <h3>정규화의 목적</h3>
+      <p>같은 사실이 두 곳에 있으면 한 곳만 수정되는 <b>갱신 이상</b>이 생겨요. 정규화는 중복을 제거해서 사실 하나가 한 곳에만 있게 만드는 과정이에요.</p>
+      <ul>
+        <li><b>1NF</b>: 모든 컬럼이 원자값. "태그: a,b,c" 같은 콤마 리스트 금지, 반복 컬럼(phone1, phone2) 금지.</li>
+        <li><b>2NF</b>: 복합키의 <b>일부</b>에만 종속된 컬럼 분리. (주문ID, 상품ID) → 상품명은 상품ID에만 종속 → 상품 테이블로.</li>
+        <li><b>3NF</b>: 키가 아닌 컬럼이 다른 비키 컬럼을 결정하면 분리. 회원(우편번호 → 시도)에서 시도는 우편번호 테이블로.</li>
+        <li><b>BCNF</b>: 모든 결정자가 후보키. 실무에선 3NF까지 가면 대부분 충분.</li>
+      </ul>
+
+      <h3>반정규화</h3>
+      <p>조회 성능을 위해 <b>의도적으로</b> 중복을 두는 것. 게시글의 댓글 수 컬럼, 주문의 상품명 스냅샷(상품명이 바뀌어도 당시 이름 유지가 목적이면 중복이 아니라 정당한 설계). 원칙: 정규화 먼저, <b>측정된 병목</b>이 있을 때만, 갱신 경로를 한 곳으로.</p>
+
+      <h3>PK 선택</h3>
+      <div class="tbl"><table>
+        <tr><th>방식</th><th>장점</th><th>단점</th></tr>
+        <tr><td>AUTO_INCREMENT</td><td>8바이트, 순차 삽입, 단순</td><td>예측 가능, 다중 마스터·샤딩 시 충돌</td></tr>
+        <tr><td>UUID v4</td><td>어디서든 생성, 충돌 없음</td><td>16~36바이트, 랜덤 삽입(8장 클러스터링 인덱스에서 왜 나쁜지)</td></tr>
+        <tr><td>UUID v7 / ULID / Snowflake</td><td>전역 유일 + 시간순</td><td>16바이트, 생성 로직 필요</td></tr>
+        <tr><td>자연키(이메일, 주민번호)</td><td>의미 있음</td><td>바뀜, 큼, 외부 노출 → 거의 항상 피함</td></tr>
+      </table></div>
+
+      <h3>외래키</h3>
+      <p>참조 무결성을 DB가 보장해요. 대가: 쓰기마다 부모 확인(락), 삭제 순서 제약, 샤딩 불가. 대규모 서비스는 FK를 빼고 애플리케이션에서 관리하기도 하지만, 그만큼 고아 데이터 위험을 떠안는 거예요. 기본은 두고, 측정된 이유가 있을 때 빼세요.</p>
+
+      <div class="backend"><b>백엔드에서는</b> JPA 엔티티를 먼저 그리고 테이블을 자동 생성하면 정규화가 안 된 스키마가 나오기 쉬워요. 테이블을 먼저 설계하세요. 그리고 "상태"를 문자열 컬럼으로 두면 오타가 데이터가 돼요. ENUM이나 코드 테이블, 또는 CHECK 제약을 쓰세요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>정규화 = 사실 하나가 한 곳에, 3NF까지가 실무 기준</li><li>반정규화는 측정 후, 갱신 경로를 한 곳으로</li><li>PK는 작고 순차적인 대리키, 자연키 지양</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>주문 테이블에 상품명을 복사해 두는 것은 반정규화인가요?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p>목적에 따라 달라요. "주문 당시의 상품명"을 보존하려는 거면 그건 상품 테이블의 현재 상품명과 다른 사실(이력)이라 중복이 아니고 정당한 설계예요. 단지 조인을 피하려고 현재 이름을 복사한 거면 반정규화이고, 상품명이 바뀔 때 갱신해야 해요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <!-- ================================================================ -->
+    <div class="part-title">1권 4장 아키텍처</div>
+
+    <section id="ch04-1" data-sec>
+      <h2>4.1 MySQL 엔진 아키텍처</h2>
+      <p class="lead">MySQL 엔진과 스토리지 엔진의 분리, 쿼리가 실행되는 경로</p>
+
+      <h3>두 층 구조</h3>
+      <ul>
+        <li><b>MySQL 엔진</b>: 커넥션 핸들러, SQL 파서, 전처리기, <b>옵티마이저</b>, 쿼리 실행기. "무엇을 어떻게 읽을지" 결정.</li>
+        <li><b>스토리지 엔진</b>: 실제로 디스크에서 데이터를 읽고 써요. <b>InnoDB</b>가 기본이고 사실상 유일한 선택이에요(MyISAM은 트랜잭션·행 락 없음). 테이블마다 다른 엔진 가능.</li>
+      </ul>
+      <p>MySQL 엔진이 스토리지 엔진에 "이 인덱스로 이 범위를 읽어 줘"라고 <b>핸들러 API</b>로 요청해요. 옵티마이저는 스토리지 엔진이 제공하는 통계를 보고 계획을 세워요.</p>
+
+      <h3>스레드 구조</h3>
+      <p>MySQL은 <b>프로세스 하나에 스레드 여러 개</b>예요. 클라이언트 연결마다 <b>포그라운드 스레드</b>(커넥션 스레드) 하나가 쿼리를 처리하고, <b>백그라운드 스레드</b>들이 로그 쓰기, 버퍼풀 플러시, 체인지 버퍼 머지, 퍼지(undo 정리)를 해요. 연결이 1000개면 스레드 1000개예요. 그래서 <code>max_connections</code>를 무작정 올리면 OS 챕터에서 본 스레드 과다 문제가 생겨요.</p>
+
+      <h3>쿼리 실행 구조</h3>
+      <ol>
+        <li><b>파서</b>: SQL을 토큰으로 나눠 트리로. 문법 오류 여기서.</li>
+        <li><b>전처리기</b>: 테이블·컬럼 존재 확인, 권한 확인.</li>
+        <li><b>옵티마이저</b>: 실행 계획 수립. (9장)</li>
+        <li><b>실행 엔진</b>: 계획대로 핸들러 호출.</li>
+        <li><b>핸들러(스토리지 엔진)</b>: 데이터 읽기/쓰기.</li>
+      </ol>
+
+      <h3>쿼리 캐시는 사라졌다</h3>
+      <p>8.0에서 쿼리 캐시가 제거됐어요. 테이블 변경 시 전체 무효화되고 락 경합이 심해서 득보다 실이 컸어요. 캐시는 애플리케이션(Redis)에서 하세요.</p>
+
+      <h3>스레드풀, 메모리</h3>
+      <p>엔터프라이즈판/Percona는 스레드풀로 커넥션 스레드 수를 제한해요. 메모리는 <b>글로벌</b>(버퍼풀, 리두 로그 버퍼 — 하나)과 <b>세션</b>(정렬 버퍼, 조인 버퍼 — 커넥션마다) 영역이 있어요. 세션 메모리는 커넥션 수만큼 곱해지니 <code>sort_buffer_size</code>를 크게 잡으면 OOM이에요.</p>
+
+      <div class="backend"><b>백엔드에서는</b> 애플리케이션 서버 N대 × 커넥션 풀 M개 = DB 스레드 N×M. 서버를 늘릴 때 DB 커넥션 수도 같이 늘어난다는 걸 잊으면 <code>Too many connections</code>예요. 서버가 늘어날수록 풀 크기를 줄이거나 ProxySQL 같은 중간 풀을 둬요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>MySQL 엔진(파서·옵티마이저) + 스토리지 엔진(InnoDB)</li><li>커넥션 = 스레드, 세션 메모리는 커넥션 수만큼</li><li>파서 → 전처리 → 옵티마이저 → 실행 → 핸들러</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>옵티마이저는 MySQL 엔진과 스토리지 엔진 중 어디에 있고, 왜 그 위치인가요?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p>MySQL 엔진. 실행 계획은 스토리지 엔진에 무관하게 SQL 레벨에서 세우는 것이기 때문이에요. 다만 비용 계산에 필요한 통계(행 수, 인덱스 카디널리티)는 스토리지 엔진이 제공해요. 그래서 통계가 틀리면 계획도 틀려요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <section id="ch04-2" data-sec>
+      <h2>4.2 InnoDB 스토리지 엔진 아키텍처</h2>
+      <p class="lead">버퍼풀, 리두·언두 로그, MVCC — InnoDB가 빠르고 안전한 이유</p>
+
+      <h3>클러스터링 인덱스</h3>
+      <p>InnoDB 테이블은 <b>PK 순서로 물리적으로 정렬 저장</b>돼요. PK 조회는 가장 빠르고, 세컨더리 인덱스는 PK 값을 들고 있어요(8장에서 자세히). PK가 없으면 유니크 인덱스, 그것도 없으면 숨은 6바이트 row id를 써요. <b>PK를 꼭 두세요.</b></p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 640 270" role="img" aria-label="InnoDB 아키텍처">
+          <rect x="20" y="12" width="600" height="36" rx="6" class="dg-soft"/><text x="320" y="35" text-anchor="middle" class="dg-t">MySQL 엔진 (파서 · 옵티마이저 · 실행기) → 핸들러 API</text>
+          <rect x="20" y="62" width="600" height="195" rx="8" class="dg-none"/><text x="30" y="78" class="dg-tm">InnoDB</text>
+          <text x="30" y="124" class="dg-tm">메모리</text>
+          <rect x="80" y="90" width="190" height="60" rx="6" class="dg-acc"/><text x="175" y="110" text-anchor="middle" class="dg-tb">버퍼풀</text><text x="175" y="126" text-anchor="middle" class="dg-tm">데이터·인덱스 페이지, LRU</text><text x="175" y="140" text-anchor="middle" class="dg-tm">dirty 페이지 → 플러시 리스트</text>
+          <rect x="290" y="90" width="110" height="60" rx="6" class="dg-box"/><text x="345" y="115" text-anchor="middle" class="dg-t">리두 로그 버퍼</text><text x="345" y="132" text-anchor="middle" class="dg-tm">변경 내용 (WAL)</text>
+          <rect x="420" y="90" width="100" height="60" rx="6" class="dg-box"/><text x="470" y="115" text-anchor="middle" class="dg-t">언두 로그</text><text x="470" y="132" text-anchor="middle" class="dg-tm">옛 값 (MVCC)</text>
+          <rect x="540" y="90" width="70" height="60" rx="6" class="dg-box"/><text x="575" y="115" text-anchor="middle" class="dg-t">체인지</text><text x="575" y="130" text-anchor="middle" class="dg-t">버퍼</text>
+          <line x1="30" y1="170" x2="610" y2="170" class="dg-sep"/>
+          <text x="30" y="220" class="dg-tm">디스크</text>
+          <rect x="80" y="195" width="190" height="40" rx="6" class="dg-box"/><text x="175" y="220" text-anchor="middle" class="dg-t">데이터 파일 (.ibd, 16KB 페이지)</text>
+          <rect x="290" y="195" width="110" height="40" rx="6" class="dg-ok"/><text x="345" y="220" text-anchor="middle" class="dg-t">리두 로그 파일</text>
+          <rect x="420" y="195" width="100" height="40" rx="6" class="dg-box"/><text x="470" y="220" text-anchor="middle" class="dg-t">언두 영역</text>
+          <rect x="540" y="195" width="70" height="40" rx="6" class="dg-box"/><text x="575" y="214" text-anchor="middle" class="dg-t">더블</text><text x="575" y="228" text-anchor="middle" class="dg-t">라이트</text>
+          <path d="M175 150 L175 193" class="dg-lm dg-ld"/><text x="182" y="182" class="dg-tm">체크포인트 (나중에)</text>
+          <path d="M345 150 L345 193" class="dg-lg"/><text x="352" y="182" class="dg-tg">커밋 시 fsync</text>
+          <path d="M470 150 L470 193" class="dg-lm dg-ld"/>
+        </svg>
+        <figcaption>변경은 버퍼풀에서, 커밋은 리두 로그 fsync로, 데이터 파일은 나중에 체크포인트로. 옛 값은 언두에 남아 MVCC를 지원한다.</figcaption>
+      </figure>
+
+      <h3>버퍼풀</h3>
+      <p>디스크의 데이터·인덱스 페이지(16KB)를 메모리에 캐시하는 공간이에요. InnoDB 성능의 핵심. <code>innodb_buffer_pool_size</code>는 전용 서버에서 물리 메모리의 <b>50~80%</b>.</p>
+      <ul>
+        <li><b>LRU 리스트</b>: OS의 페이지 교체와 같은 문제. 풀스캔이 캐시를 쓸어버리는 걸 막으려고 new/old 두 영역(midpoint insertion)으로 나눠요. 새 페이지는 old에 들어가고, 일정 시간 안에 다시 접근되면 new로 올라가요.</li>
+        <li><b>플러시 리스트</b>: 변경된(dirty) 페이지 목록. 백그라운드가 주기적으로 디스크에 써요(체크포인트).</li>
+        <li><b>더블 라이트 버퍼</b>: 16KB 페이지를 쓰다 중간에 죽으면 반만 쓰인 페이지(torn page)가 돼요. 먼저 별도 영역에 순차로 쓰고 실제 위치에 써서, 복구 시 온전한 복사본을 써요.</li>
+      </ul>
+
+      <h3>리두 로그 (WAL)</h3>
+      <p>OS 챕터 42장 저널링 그대로예요. 변경은 버퍼풀에서 하고, <b>"무엇을 바꿨는지"를 리두 로그에 순차로 먼저 써요</b>. 커밋 = 리두 로그 디스크 기록. 데이터 페이지는 나중에 체크포인트 때 써요. 크래시 후 복구는 리두 로그를 재실행(redo).</p>
+      <p><code>innodb_flush_log_at_trx_commit</code>: <b>1</b> = 커밋마다 fsync(안전, ACID의 D), <b>2</b> = 커밋마다 OS 버퍼에 쓰고 1초마다 fsync(MySQL 크래시엔 안전, OS 크래시엔 1초 유실), <b>0</b> = 1초마다(가장 빠름, 1초 유실). 리두 로그 파일이 작으면 체크포인트가 잦아 성능이 떨어져요.</p>
+
+      <h3>언두 로그</h3>
+      <p>변경 <b>전</b> 값을 저장해요. 두 가지 용도: (1) <b>롤백</b>, (2) <b>MVCC</b>(다른 트랜잭션이 옛 버전을 읽을 때). 오래 열린 트랜잭션이 있으면 그 시점 이후의 언두를 지울 수 없어서(퍼지 불가) 언두 공간이 커지고 느려져요. 트랜잭션은 짧게.</p>
+
+      <h3>MVCC</h3>
+      <p>행을 UPDATE하면 버퍼풀의 행은 새 값, 언두 로그에는 옛 값이 남아요. 다른 트랜잭션이 그 행을 읽으면 자기 격리 수준과 시작 시점에 따라 <b>버퍼풀 값 또는 언두의 옛 값</b>을 봐요. 그래서 <b>읽기는 쓰기를 기다리지 않고, 쓰기도 읽기를 기다리지 않아요</b>. 잠금 없는 일관된 읽기(consistent non-locking read). 5장에서 격리 수준과 연결돼요.</p>
+
+      <h3>그 외</h3>
+      <ul>
+        <li><b>체인지 버퍼</b>: 세컨더리 인덱스 페이지가 버퍼풀에 없을 때 변경을 임시 저장했다가 나중에 페이지가 읽힐 때 머지. 랜덤 I/O를 줄여요. 유니크 인덱스엔 못 써요(중복 확인 필요).</li>
+        <li><b>어댑티브 해시 인덱스</b>: 자주 접근하는 B-Tree 페이지를 해시로 바로 가게. 자동.</li>
+        <li><b>자동 데드락 감지</b>: 대기 그래프 사이클을 찾아 언두 양이 적은 쪽을 롤백. (5장)</li>
+      </ul>
+
+      <div class="backend"><b>백엔드에서는</b> 버퍼풀 히트율(<code>SHOW ENGINE INNODB STATUS</code>의 Buffer pool hit rate)이 99% 아래면 메모리 부족이에요. "DB가 느려졌다"의 첫 확인 항목. 장시간 트랜잭션(배치 작업에서 수십만 건을 한 트랜잭션으로)은 언두를 폭증시키고 다른 쿼리까지 느리게 해요. 배치는 1000건씩 끊어서 커밋하세요. 그리고 <code>innodb_flush_log_at_trx_commit=1</code> + 느린 디스크 = 커밋마다 fsync 대기 = 쓰기 처리량 한계. 클라우드에서는 디스크 IOPS 티어가 곧 TPS 상한이에요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>버퍼풀 = 페이지 캐시(LRU old/new), 히트율이 성능</li><li>리두 로그 = WAL, 커밋 = 로그 fsync. 언두 로그 = 롤백 + MVCC</li><li>MVCC = 읽기와 쓰기가 서로 안 막음, 긴 트랜잭션은 언두 폭증</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>커밋했는데 데이터 파일에는 아직 안 써졌어요. 지금 서버가 죽으면 데이터는 안전한가요?</li><li>풀스캔 한 번이 버퍼풀을 망치지 않는 이유는?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p><b>1.</b> <code>innodb_flush_log_at_trx_commit=1</code>이면 안전해요. 커밋 시 리두 로그가 fsync됐고, 재시작 시 리두 로그를 재실행해 데이터 페이지를 복원해요. 데이터 파일은 체크포인트 때 써지면 돼요.</p>
+          <p><b>2.</b> LRU를 old/new로 나누고 새로 읽힌 페이지는 old 영역에 넣어요. 풀스캔으로 한 번만 읽힌 페이지는 old에서 밀려나고, 자주 쓰는 new 영역의 페이지는 살아남아요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <!-- ================================================================ -->
+    <div class="part-title">1권 5장 트랜잭션과 잠금</div>
+
+    <section id="ch05-1" data-sec>
+      <h2>5.1 트랜잭션</h2>
+      <p class="lead">ACID와 "트랜잭션을 짧게"의 진짜 의미</p>
+
+      <h3>ACID</h3>
+      <ul>
+        <li><b>Atomicity</b>: 전부 반영 또는 전부 취소. 언두 로그로 롤백.</li>
+        <li><b>Consistency</b>: 제약 조건(PK, FK, UNIQUE, CHECK)이 트랜잭션 전후로 유지. 애플리케이션 불변식은 애플리케이션 책임.</li>
+        <li><b>Isolation</b>: 동시 트랜잭션이 서로 안 보이게. 격리 수준으로 정도 조절(5.4).</li>
+        <li><b>Durability</b>: 커밋되면 영구. 리두 로그 fsync.</li>
+      </ul>
+
+      <h3>트랜잭션이 없으면</h3>
+      <p>MyISAM에서 3건 INSERT 중 2번째가 실패하면 1건은 남아요. InnoDB는 전부 롤백돼요. 이게 "부분 실패를 신경 쓰지 않아도 된다"는 거예요.</p>
+
+      <h3>트랜잭션 범위 최소화</h3>
+      <p>책의 핵심 메시지. 다음을 트랜잭션 <b>밖</b>으로 빼세요.</p>
+      <ul>
+        <li>입력 검증, 외부 API 호출(메일, 결제 PG, 파일 업로드), 메시지 발행</li>
+        <li>트랜잭션과 무관한 조회</li>
+      </ul>
+      <p>이유: 트랜잭션이 열려 있는 동안 (1) 잡은 락이 유지되고, (2) 언두가 쌓이고, (3) 커넥션을 점유해요. 외부 API가 3초 걸리면 그동안 락과 커넥션이 묶여요. 외부 API가 타임아웃되면 DB 커넥션 풀이 고갈돼요.</p>
+
+      <div class="backend"><b>백엔드에서는</b> <code>@Transactional</code> 메서드 안에서 외부 HTTP 호출을 하는 게 가장 흔한 실수예요. 서비스 메서드 전체에 붙이지 말고 DB 작업만 묶은 작은 메서드에 붙이거나, <code>TransactionTemplate</code>으로 범위를 명시하세요. 또 <code>@Transactional(readOnly = true)</code>는 InnoDB에 읽기 전용임을 알려 일부 최적화(트랜잭션 ID 미할당)가 되고, 복제 환경에서 replica로 라우팅하는 기준이 돼요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>A = 언두, D = 리두, I = 격리 수준, C = 제약 조건</li><li>트랜잭션 안에는 DB 작업만. 외부 호출·검증은 밖으로</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>주문 생성 → 결제 PG 호출 → 주문 상태 갱신을 한 트랜잭션에 넣으면 생기는 문제 세 가지는?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p>(1) PG 호출 동안(수 초) 주문 행 락과 DB 커넥션 점유 → 풀 고갈. (2) PG 성공 후 상태 갱신이 실패해 롤백되면 결제는 됐는데 주문이 없음(외부 부수효과는 롤백 안 됨). (3) PG 타임아웃 시 결제됐는지 알 수 없는데 트랜잭션은 롤백 → 불일치. 해결: 주문 생성 커밋 → PG 호출 → 별도 트랜잭션으로 상태 갱신, 실패 시 보상/재조회.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <section id="ch05-2" data-sec>
+      <h2>5.2 MySQL 엔진의 잠금</h2>
+      <p class="lead">스토리지 엔진 위에서 걸리는 락들 — 글로벌, 테이블, 네임드, 메타데이터</p>
+
+      <h3>글로벌 락</h3>
+      <p><code>FLUSH TABLES WITH READ LOCK</code>. 서버 전체를 읽기 전용으로. 백업용이지만 모든 쓰기가 멈춰요. 8.0은 백업 락(<code>LOCK INSTANCE FOR BACKUP</code>)으로 DDL만 막고 DML은 허용해요.</p>
+
+      <h3>테이블 락</h3>
+      <p><code>LOCK TABLES</code>로 명시적으로, 또는 MyISAM은 DML마다 암묵적으로. InnoDB는 행 락이 있어 DML에선 안 걸리고 DDL에서만 걸려요.</p>
+
+      <h3>네임드 락</h3>
+      <p><code>GET_LOCK('name', timeout)</code> / <code>RELEASE_LOCK('name')</code>. 테이블이나 행이 아니라 <b>임의의 문자열</b>에 락을 걸어요. 여러 서버에서 같은 배치가 동시에 돌지 않게 하는 분산 락으로 써요. 세션이 끊기면 자동 해제돼요.</p>
+
+      <h3>메타데이터 락 (MDL)</h3>
+      <p>테이블 구조를 바꾸는 동안(ALTER, RENAME) 걸리는 락이에요. 그런데 <b>DML도 실행 중엔 MDL(shared)을 잡아요</b>. 트랜잭션이 열려 있으면 끝날 때까지 유지돼요. 그래서 긴 트랜잭션이 하나 있으면 ALTER가 그걸 기다리고, ALTER 뒤에 온 모든 쿼리가 ALTER를 기다려 <b>전체가 멈춰요</b>. 운영 중 DDL의 가장 큰 위험이에요.</p>
+
+      <div class="backend"><b>백엔드에서는</b> 운영 중 ALTER TABLE 전에 <code>SHOW PROCESSLIST</code>로 긴 트랜잭션이 없는지 확인하고, <code>lock_wait_timeout</code>을 짧게 설정해서 MDL을 못 잡으면 빨리 실패하게 하세요. pt-online-schema-change, gh-ost는 새 테이블을 만들어 복사하고 마지막에 rename해서 MDL 점유 시간을 최소화해요. 네임드 락은 스프링 배치 중복 실행 방지, 쿠폰 발급 같은 임계 구역에 간단히 쓸 수 있어요. 단 세션 단위라 커넥션 풀에서 같은 커넥션으로 락/해제를 해야 해요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>InnoDB DML은 행 락, DDL은 테이블·메타데이터 락</li><li>MDL: 긴 트랜잭션 + ALTER = 전체 멈춤</li><li>네임드 락 = 문자열 기반 분산 락</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>작은 테이블에 컬럼 하나 추가하는 ALTER가 전체 서비스를 멈추게 한 시나리오를 설명하세요.</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p>어떤 세션이 그 테이블을 SELECT한 트랜잭션을 커밋하지 않고 열어둠(MDL shared 유지) → ALTER가 MDL exclusive를 기다림 → ALTER 뒤에 들어온 모든 SELECT/DML이 MDL 큐에서 ALTER 뒤로 줄 섬 → 테이블 접근이 전부 멈춤. 해결: 긴 트랜잭션 kill, 또는 ALTER를 kill.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <section id="ch05-3" data-sec>
+      <h2>5.3 InnoDB 스토리지 엔진 잠금</h2>
+      <p class="lead">레코드 락, 갭 락, 넥스트 키 락 — 그리고 "인덱스와 잠금"</p>
+
+      <h3>InnoDB는 인덱스 레코드를 잠근다</h3>
+      <p>가장 중요한 문장이에요. InnoDB의 락은 행이 아니라 <b>인덱스의 레코드</b>에 걸려요. 그래서 어떤 인덱스로 찾았느냐가 잠기는 범위를 결정해요.</p>
+
+      <h3>락의 종류</h3>
+      <ul>
+        <li><b>레코드 락</b>: 인덱스 레코드 하나. <code>WHERE id = 5 FOR UPDATE</code>(id가 PK/유니크).</li>
+        <li><b>갭 락</b>: 레코드 <b>사이의 간격</b>. 그 범위에 새 레코드가 INSERT되는 걸 막아요. 레코드 자체는 안 잠가요.</li>
+        <li><b>넥스트 키 락</b>: 레코드 락 + 그 앞 갭 락. REPEATABLE READ에서 범위 검색 시 기본. phantom read 방지가 목적.</li>
+        <li><b>자동 증가 락</b>: AUTO_INCREMENT 값을 뽑을 때 아주 짧게. <code>innodb_autoinc_lock_mode=2</code>(8.0 기본)면 거의 경합 없음.</li>
+        <li><b>삽입 의도 락</b>: INSERT 전에 갭에 거는 특수 락. 같은 갭에 다른 위치로 INSERT하는 건 서로 안 막아요.</li>
+      </ul>
+      <figure class="diagram">
+        <svg viewBox="0 0 640 150" role="img" aria-label="레코드 락, 갭 락, 넥스트 키 락">
+          <text x="20" y="16" class="dg-tm">인덱스 레코드: 10, 20, 30, 40 · SELECT … WHERE id BETWEEN 15 AND 25 FOR UPDATE (RR)</text>
+          <path d="M122 44 L270 44" class="dg-plain" style="stroke:var(--accent)"/><line x1="122" y1="40" x2="122" y2="48" class="dg-plain" style="stroke:var(--accent)"/><line x1="270" y1="40" x2="270" y2="48" class="dg-plain" style="stroke:var(--accent)"/><text x="196" y="36" text-anchor="middle" class="dg-ta">넥스트 키 락 (10, 20]</text>
+          <line x1="40" y1="85" x2="600" y2="85" class="dg-plain"/>
+          <rect x="122" y="66" width="106" height="38" rx="4" class="dg-warn" style="fill-opacity:.55"/><rect x="272" y="66" width="106" height="38" rx="4" class="dg-warn" style="fill-opacity:.55"/>
+          <text x="175" y="60" text-anchor="middle" class="dg-tw">갭 락 (10,20)</text><text x="325" y="60" text-anchor="middle" class="dg-tw">갭 락 (20,30)</text>
+          <rect x="80" y="70" width="40" height="30" rx="4" class="dg-box"/><text x="100" y="90" text-anchor="middle" class="dg-t">10</text>
+          <rect x="230" y="70" width="40" height="30" rx="4" class="dg-acc"/><text x="250" y="90" text-anchor="middle" class="dg-tb">20</text>
+          <rect x="380" y="70" width="40" height="30" rx="4" class="dg-box"/><text x="400" y="90" text-anchor="middle" class="dg-t">30</text>
+          <rect x="530" y="70" width="40" height="30" rx="4" class="dg-box"/><text x="550" y="90" text-anchor="middle" class="dg-t">40</text>
+          <text x="250" y="122" text-anchor="middle" class="dg-ta">레코드 락 (20)</text>
+          <text x="325" y="142" text-anchor="middle" class="dg-tm">INSERT id=15, 25 → 갭 락에 막힘 · INSERT id=35 → 통과</text>
+        </svg>
+        <figcaption>락은 행이 아니라 인덱스 레코드와 그 사이 간격에 걸린다. 범위 조건의 FOR UPDATE가 그 범위 INSERT를 막는 이유.</figcaption>
+      </figure>
+
+      <h3>인덱스와 잠금 — 핵심 예제</h3>
+<pre><code>-- employees 테이블: first_name에만 인덱스, last_name엔 없음
+-- first_name='Georgi'인 행 253건, 그중 last_name='Klassen'은 1건
+
+UPDATE employees SET hire_date = NOW()
+WHERE first_name = 'Georgi' AND last_name = 'Klassen';</code></pre>
+      <p>결과: <b>253건 전부 잠겨요.</b> InnoDB는 first_name 인덱스로 253건을 읽으면서 전부 잠그고, 그중 last_name 조건으로 1건만 갱신해요. 인덱스가 <b>아예 없으면 테이블 전체</b>를 잠가요. 그래서 UPDATE/DELETE의 WHERE 조건에는 반드시 적절한 인덱스가 필요해요. 이게 "UPDATE 하나가 서비스 전체를 멈추는" 원리예요.</p>
+
+      <h3>잠금 확인</h3>
+<pre><code>SHOW PROCESSLIST;                                   -- 어떤 쿼리가 대기 중인지
+SELECT * FROM performance_schema.data_locks;        -- 어떤 락을 잡고 있는지
+SELECT * FROM performance_schema.data_lock_waits;   -- 누가 누구를 기다리는지
+KILL &lt;id&gt;;                                          -- 문제 세션 종료</code></pre>
+
+      <h3>데드락</h3>
+      <p>InnoDB는 대기 그래프를 보고 자동 감지해 <b>언두 레코드가 적은 트랜잭션을 롤백</b>해요(<code>ER_LOCK_DEADLOCK</code>). 애플리케이션은 이 에러를 재시도해야 해요. <code>SHOW ENGINE INNODB STATUS</code>의 LATEST DETECTED DEADLOCK에서 원인 쿼리를 볼 수 있어요. 예방은 OS 챕터 32장: 접근 순서 고정.</p>
+
+      <div class="backend"><b>백엔드에서는</b> <code>SELECT ... FOR UPDATE</code>를 범위 조건으로 쓰면 넥스트 키 락이 걸려 그 범위 INSERT가 전부 막혀요. 가능하면 PK로 특정 행만. 그리고 <code>innodb_lock_wait_timeout</code>(기본 50초!)을 애플리케이션 타임아웃에 맞게 줄이세요. 안 그러면 락 대기 중인 스레드가 50초씩 묶여요. JPA의 <code>@Lock(PESSIMISTIC_WRITE)</code>이 FOR UPDATE, <code>@Version</code>이 낙관적 락이에요. 충돌이 드물면 낙관적 락 + 재시도가 처리량이 높고, 잦으면 비관적 락이 재시도 폭풍을 막아요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>락은 인덱스 레코드에. 인덱스 없는 UPDATE = 테이블 전체 잠금</li><li>갭 락·넥스트 키 락이 범위 INSERT를 막음</li><li>데드락은 자동 롤백 → 재시도 필수, 순서 고정으로 예방</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>위 예제에서 253건이 아니라 1건만 잠그게 하려면?</li><li>재고 차감의 세 가지 동시성 제어 방법과 선택 기준은?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p><b>1.</b> <code>(first_name, last_name)</code> 복합 인덱스를 만들면 인덱스에서 1건만 찾아 1건만 잠가요.</p>
+          <p><b>2.</b> (a) 원자적 UPDATE(<code>SET qty = qty - 1 WHERE id = ? AND qty >= 1</code>, 영향 행 0이면 실패): 가장 단순·빠름, 복잡한 검증 불가. (b) 비관적 락(<code>FOR UPDATE</code> 후 검증·갱신): 확실, 대기 발생, 충돌 잦을 때. (c) 낙관적 락(version 비교): 락 없음, 충돌 시 재시도, 충돌 드물 때. 핫 상품은 (a) 또는 Redis 원자 연산.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <section id="ch05-4" data-sec>
+      <h2>5.4 트랜잭션 격리 수준</h2>
+      <p class="lead">READ UNCOMMITTED부터 SERIALIZABLE까지, 그리고 InnoDB의 REPEATABLE READ</p>
+
+      <h3>이상 현상</h3>
+      <ul>
+        <li><b>Dirty read</b>: 커밋 안 된 변경을 읽음. 롤백되면 없는 값을 본 것.</li>
+        <li><b>Non-repeatable read</b>: 같은 행을 두 번 읽었는데 사이에 다른 트랜잭션이 커밋해 값이 다름.</li>
+        <li><b>Phantom read</b>: 같은 조건을 두 번 읽었는데 사이에 INSERT되어 행이 늘어남.</li>
+      </ul>
+
+      <h3>격리 수준</h3>
+      <div class="tbl"><table>
+        <tr><th>수준</th><th>Dirty</th><th>Non-repeatable</th><th>Phantom</th><th>동작</th></tr>
+        <tr><td>READ UNCOMMITTED</td><td>O</td><td>O</td><td>O</td><td>버퍼풀 값을 그냥 읽음. 쓰지 마세요.</td></tr>
+        <tr><td>READ COMMITTED</td><td>-</td><td>O</td><td>O</td><td>쿼리마다 새 스냅샷. 커밋된 최신을 봄. Oracle, PostgreSQL 기본.</td></tr>
+        <tr><td>REPEATABLE READ</td><td>-</td><td>-</td><td>InnoDB는 거의 -</td><td>트랜잭션 첫 읽기 시점 스냅샷 유지. <b>InnoDB 기본</b>.</td></tr>
+        <tr><td>SERIALIZABLE</td><td>-</td><td>-</td><td>-</td><td>읽기에도 공유 락. 동시성 최저.</td></tr>
+      </table></div>
+
+      <h3>InnoDB REPEATABLE READ의 동작</h3>
+      <p>트랜잭션은 번호를 받아요. 일반 SELECT는 <b>자기 번호보다 작은(먼저 시작해 커밋된) 트랜잭션의 변경만</b> 봐요. 더 큰 번호가 바꾼 행은 언두 로그에서 옛 버전을 찾아 읽어요. 그래서 트랜잭션 안에서 같은 SELECT는 항상 같은 결과예요.</p>
+      <p>Phantom: 일반 SELECT는 스냅샷이라 새 행이 안 보여요. <code>SELECT ... FOR UPDATE</code>는 스냅샷이 아니라 현재 데이터를 잠금 읽기하는데, 넥스트 키 락으로 범위에 INSERT를 막아 phantom을 방지해요. 단, 일반 SELECT와 잠금 읽기를 섞으면 결과가 달라 보일 수 있어요.</p>
+
+      <h3>READ COMMITTED를 쓰는 경우</h3>
+      <p>갭 락이 거의 안 걸려 INSERT 경합이 적고, 긴 트랜잭션의 언두 부담도 적어요. 대신 같은 트랜잭션 안에서 값이 바뀔 수 있어요. PostgreSQL 사용자는 이게 기본이라 익숙해요. MySQL에서 바꾸려면 바이너리 로그 포맷이 ROW여야 해요(16장).</p>
+
+      <div class="backend"><b>백엔드에서는</b> "재고 확인 후 차감"에서 SELECT로 10개 확인 → UPDATE 하는 사이 다른 트랜잭션이 차감하면? REPEATABLE READ라도 SELECT는 스냅샷일 뿐 락이 아니라서 막지 못해요. 확인-갱신은 <code>FOR UPDATE</code>로 잠금 읽기하거나 원자적 UPDATE로 해야 해요. 격리 수준은 "읽기의 일관성"이지 "쓰기 경쟁 방지"가 아니에요. 그리고 JPA 영속성 컨텍스트(1차 캐시)는 DB 격리 수준과 별개로 같은 엔티티를 반복 읽기처럼 보이게 해요. 둘을 혼동하지 마세요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>RC = 쿼리마다 스냅샷, RR = 트랜잭션당 스냅샷(InnoDB 기본)</li><li>스냅샷 읽기는 락이 아님. 확인-갱신은 FOR UPDATE나 원자적 UPDATE</li><li>InnoDB RR은 넥스트 키 락으로 phantom 대부분 방지</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>REPEATABLE READ에서 두 세션이 같은 행을 UPDATE하면 두 번째는 무엇을 기준으로 갱신하나요?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p>UPDATE는 스냅샷이 아니라 <b>현재 커밋된 최신 값</b>을 잠금 읽기해서 갱신해요. 첫 세션이 커밋할 때까지 기다렸다가 그 결과 위에 갱신해요. 그래서 <code>SET qty = qty - 1</code>은 안전하고, <code>SELECT</code>로 읽은 값을 애플리케이션에서 계산해 <code>SET qty = 9</code>로 쓰면 lost update가 나요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <!-- ================================================================ -->
+    <div class="part-title">1권 8장 인덱스</div>
+
+    <section id="ch08-1" data-sec>
+      <h2>8.1~8.2 디스크 읽기 방식과 인덱스란</h2>
+      <p class="lead">랜덤 I/O vs 순차 I/O, 그리고 인덱스가 빠른 이유와 느린 이유</p>
+
+      <h3>랜덤 I/O와 순차 I/O</h3>
+      <p>OS 챕터 37장. 디스크 I/O 비용은 <b>횟수</b>가 결정해요. 3개 페이지를 순차로 읽으면 1번 I/O, 흩어져 있으면 3번. SSD도 랜덤이 느려요. 쿼리 튜닝 = <b>랜덤 I/O 횟수 줄이기</b>.</p>
+
+      <h3>인덱스란</h3>
+      <p>책의 색인. 컬럼 값과 그 값을 가진 행의 위치(InnoDB는 PK)를 <b>정렬해서</b> 따로 저장한 것. 정렬돼 있으니 찾기는 빠르고(이진 탐색 가능), <b>INSERT/UPDATE/DELETE마다 정렬을 유지해야 하니 쓰기는 느려져요</b>. 인덱스는 "읽기 속도를 위해 쓰기 속도를 희생하는 것"이에요.</p>
+
+      <h3>인덱스 종류</h3>
+      <ul>
+        <li><b>B-Tree</b>: 범위, 정렬, 접두사 모두 가능. 기본.</li>
+        <li><b>Hash</b>: 등호 비교만, 매우 빠름. InnoDB는 어댑티브 해시만(메모리 엔진에서 명시 가능).</li>
+        <li><b>전문 검색(Fulltext)</b>, <b>공간(R-Tree)</b>, <b>함수 기반</b>, <b>멀티 밸류(JSON 배열)</b>: 8.5</li>
+      </ul>
+      <p>유니크 인덱스는 중복 확인 때문에 쓰기 시 체인지 버퍼를 못 써요. 그래도 유일성이 필요하면 꼭 두세요. 애플리케이션 검사는 경쟁 조건에 뚫려요.</p>
+
+      <div class="backend"><b>백엔드에서는</b> "인덱스를 많이 걸수록 좋다"는 착각이 가장 흔해요. 인덱스 5개면 INSERT마다 B-Tree 5개 + 클러스터링 인덱스를 갱신해요. 쓰기 위주 테이블(로그, 이벤트)은 인덱스를 최소로. 그리고 인덱스마다 버퍼풀 공간을 차지하니, 안 쓰는 인덱스는 메모리 낭비예요. <code>sys.schema_unused_indexes</code>로 찾아 지우세요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>I/O 비용 = 횟수, 튜닝 = 랜덤 I/O 줄이기</li><li>인덱스 = 정렬된 복사본. 읽기 빠름, 쓰기 느림, 메모리 차지</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>인덱스를 추가하면 느려지는 작업과 그 이유는?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p>INSERT, DELETE, 그리고 인덱스 컬럼을 바꾸는 UPDATE. 각 인덱스 B-Tree에서 정렬 위치를 찾아 삽입/삭제해야 하고, 페이지가 꽉 차면 분할도 일어나요. 또 버퍼풀 메모리를 나눠 써서 데이터 페이지 히트율이 떨어질 수 있어요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <section id="ch08-3" data-sec>
+      <h2>8.3 B-Tree 인덱스</h2>
+      <p class="lead">구조, 키 추가·삭제·검색, 그리고 인덱스를 못 쓰는 조건들</p>
+
+      <h3>구조</h3>
+      <figure class="diagram">
+        <svg viewBox="0 0 640 220" role="img" aria-label="B+Tree 구조">
+          <rect x="270" y="15" width="100" height="32" rx="5" class="dg-acc"/><text x="320" y="36" text-anchor="middle" class="dg-tb">50 | 100</text>
+          <text x="382" y="36" class="dg-tm">루트 · 항상 버퍼풀에</text>
+          <rect x="60" y="80" width="110" height="32" rx="5" class="dg-box"/><text x="115" y="101" text-anchor="middle" class="dg-t">10 | 30</text>
+          <rect x="265" y="80" width="110" height="32" rx="5" class="dg-box"/><text x="320" y="101" text-anchor="middle" class="dg-t">60 | 80</text>
+          <rect x="470" y="80" width="110" height="32" rx="5" class="dg-box"/><text x="525" y="101" text-anchor="middle" class="dg-t">120 | 150</text>
+          <text x="590" y="101" class="dg-tm">브랜치</text>
+          <path d="M300 47 L115 80" class="dg-plain"/><path d="M320 47 L320 80" class="dg-plain"/><path d="M340 47 L525 80" class="dg-plain"/>
+          <rect x="10" y="150" width="92" height="34" rx="5" class="dg-ok"/><text x="56" y="171" text-anchor="middle" class="dg-t">1~9</text>
+          <rect x="112" y="150" width="92" height="34" rx="5" class="dg-ok"/><text x="158" y="171" text-anchor="middle" class="dg-t">10~29</text>
+          <rect x="214" y="150" width="92" height="34" rx="5" class="dg-ok"/><text x="260" y="171" text-anchor="middle" class="dg-t">30~49</text>
+          <rect x="316" y="150" width="92" height="34" rx="5" class="dg-ok"/><text x="362" y="171" text-anchor="middle" class="dg-t">50~59</text>
+          <rect x="418" y="150" width="92" height="34" rx="5" class="dg-ok"/><text x="464" y="171" text-anchor="middle" class="dg-t">60~79</text>
+          <rect x="520" y="150" width="92" height="34" rx="5" class="dg-ok"/><text x="566" y="171" text-anchor="middle" class="dg-t">80~99 …</text>
+          <path d="M90 112 L56 150" class="dg-plain"/><path d="M115 112 L158 150" class="dg-plain"/><path d="M140 112 L260 150" class="dg-plain"/>
+          <path d="M295 112 L362 150" class="dg-plain"/><path d="M320 112 L464 150" class="dg-plain"/><path d="M345 112 L566 150" class="dg-plain"/>
+          <path d="M102 167 L112 167" class="dg-la" style="marker-start:url(#arra)"/><path d="M204 167 L214 167" class="dg-la" style="marker-start:url(#arra)"/><path d="M306 167 L316 167" class="dg-la" style="marker-start:url(#arra)"/><path d="M408 167 L418 167" class="dg-la" style="marker-start:url(#arra)"/><path d="M510 167 L520 167" class="dg-la" style="marker-start:url(#arra)"/>
+          <text x="320" y="208" text-anchor="middle" class="dg-tm">리프: 정렬된 (키, PK) · 리프끼리 연결 리스트 → 범위 검색은 첫 위치만 찾고 옆으로 순차 읽기</text>
+        </svg>
+        <figcaption>페이지(16KB)마다 키가 수백 개 들어가서 수천만 건도 높이 3~4. 상위 노드는 거의 항상 메모리에 있다.</figcaption>
+      </figure>
+      <p>InnoDB는 B+Tree. 키는 리프에만 있고, 브랜치는 길잡이예요. 페이지(16KB)마다 키가 수백 개 들어가서 수천만 건도 높이 3~4예요. 리프가 연결돼 있어 범위 검색은 첫 위치만 찾고 옆으로 읽어요(순차 I/O).</p>
+      <p><b>세컨더리 인덱스의 리프에는 PK 값이 있어요.</b> 그래서 세컨더리 인덱스로 찾은 뒤 나머지 컬럼이 필요하면 PK로 클러스터링 인덱스를 다시 찾아요. 이게 비용이에요(8.8 클러스터링 인덱스, 10장 Using index).</p>
+
+      <h3>키 추가·삭제·변경</h3>
+      <ul>
+        <li><b>추가</b>: 위치 찾아 삽입. 페이지가 꽉 차면 <b>분할</b>(비용 큼). 세컨더리 인덱스는 체인지 버퍼로 지연 가능.</li>
+        <li><b>삭제</b>: 삭제 마크만. 공간은 나중에 재활용.</li>
+        <li><b>변경</b>: 삭제 + 추가.</li>
+      </ul>
+      <p>테이블의 인덱스가 3개면 INSERT 비용은 대략 1(데이터) + 1.5 × 3(인덱스)로 책은 설명해요.</p>
+
+      <h3>검색: 인덱스를 쓸 수 있는 조건</h3>
+      <p>B-Tree는 <b>왼쪽 값(접두사)부터</b> 찾아요. 전화번호부에서 "성"을 모르면 "이름"으로 못 찾는 것과 같아요.</p>
+      <div class="tbl"><table>
+        <tr><th>조건</th><th>인덱스 사용</th></tr>
+        <tr><td><code>col = ?</code>, <code>col IN (...)</code>, <code>col BETWEEN</code>, <code>col > ?</code></td><td>O</td></tr>
+        <tr><td><code>col LIKE 'abc%'</code></td><td>O (접두사)</td></tr>
+        <tr><td><code>col LIKE '%abc'</code></td><td><b>X</b> (왼쪽이 불확정)</td></tr>
+        <tr><td><code>col <> ?</code>, <code>col NOT IN</code></td><td>거의 X (대부분 행이 해당)</td></tr>
+        <tr><td><code>WHERE DATE(created_at) = ?</code>, <code>WHERE col + 1 = ?</code></td><td><b>X</b> (컬럼을 변형하면 못 씀)</td></tr>
+        <tr><td><code>WHERE varchar_col = 123</code></td><td><b>X</b> (타입 불일치 → 컬럼이 변환됨)</td></tr>
+        <tr><td><code>WHERE col IS NULL</code></td><td>O (InnoDB는 NULL도 인덱싱)</td></tr>
+      </table></div>
+
+      <h3>인덱스 스캔 방식</h3>
+      <ul>
+        <li><b>레인지 스캔</b>: 시작점 찾고 필요한 만큼 순서대로. 가장 좋음. <code>type: range, ref, const</code></li>
+        <li><b>풀 스캔</b>: 인덱스 전체를 처음부터 끝까지. 조건 컬럼이 인덱스에 있지만 접두사가 아닐 때. 테이블보다는 작아서 풀 테이블 스캔보다 나음. <code>type: index</code></li>
+        <li><b>루스 스캔</b>: 중간중간 건너뛰며. GROUP BY, MIN/MAX 최적화.</li>
+        <li><b>스킵 스캔</b>(8.0): 선행 컬럼 조건 없이 후행 컬럼으로. 선행 컬럼의 유니크 값이 적을 때만.</li>
+      </ul>
+
+      <h3>다중 컬럼 인덱스와 컬럼 순서</h3>
+      <p><code>INDEX (a, b, c)</code>는 a로 정렬, a 같으면 b, b 같으면 c. 쓸 수 있는 조건: a / a,b / a,b,c. b만, c만, b,c는 접두사가 아니라 못 써요(스킵 스캔 제외). <b>범위 조건 뒤의 컬럼은 범위를 좁히지 못해요.</b> <code>WHERE a = 1 AND b > 10 AND c = 5</code>는 (a, b)까지만 탐색 범위, c는 읽으면서 필터. 그래서 등호 컬럼을 앞에, 범위 컬럼을 뒤에.</p>
+
+      <h3>정렬 방향</h3>
+      <p>8.0부터 <code>INDEX (a ASC, b DESC)</code>처럼 컬럼별 방향 지정 가능. <code>ORDER BY a, b DESC</code>를 인덱스만으로 처리하려면 필요해요. 역순 스캔은 정순보다 약간 느려요(페이지 잠금 방향 때문).</p>
+
+      <div class="backend"><b>백엔드에서는</b> 가장 흔한 "인덱스 있는데 안 탐" 원인: (1) <code>LIKE '%검색어%'</code> → 전문 검색이나 검색 엔진으로, (2) <code>DATE(created_at) = '2024-01-01'</code> → <code>created_at >= '2024-01-01' AND created_at < '2024-01-02'</code>로, (3) 문자열 컬럼에 숫자 비교 → 타입 맞추기, (4) 복합 인덱스 순서가 쿼리 패턴과 안 맞음 → 등호 컬럼 먼저. JPA에서는 생성되는 SQL을 로그로 보고 EXPLAIN하세요. 보이지 않는 SQL이 느린 SQL이에요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>B+Tree: 리프에 키+PK, 리프 연결, 높이 3~4</li><li>왼쪽 접두사 규칙. 컬럼 변형·타입 불일치·<code>%abc</code>는 못 씀</li><li>복합 인덱스: 등호 먼저, 범위 뒤. 범위 뒤 컬럼은 필터만</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li><code>INDEX (status, created_at)</code>에서 <code>WHERE status IN ('A','B') AND created_at > ?</code>와 <code>WHERE created_at > ? AND status = 'A'</code>는 각각 인덱스를 어떻게 쓰나요?</li><li>왜 <code>WHERE phone = 01012345678</code>(숫자)은 varchar 컬럼 인덱스를 못 쓰나요?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p><b>1.</b> 둘 다 같은 인덱스를 써요. WHERE 절 순서는 무관하고 옵티마이저가 인덱스 순서대로 재배치해요. status가 등호(IN은 등호 여러 개)라 (status, created_at) 둘 다 탐색 범위에 쓰여요. 만약 인덱스가 (created_at, status)였다면 created_at 범위 뒤의 status는 필터로만 쓰여 효율이 떨어져요.</p>
+          <p><b>2.</b> MySQL은 문자열과 숫자 비교 시 <b>문자열을 숫자로 변환</b>해요. 컬럼 쪽이 변환되니 인덱스의 정렬 순서를 쓸 수 없어 풀스캔. <code>'01012345678'</code>로 문자열 리터럴을 써야 해요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <section id="ch08-8" data-sec>
+      <h2>8.8 클러스터링 인덱스</h2>
+      <p class="lead">InnoDB 테이블은 PK 순서로 저장된다 — 이것이 모든 것을 바꾼다</p>
+
+      <h3>클러스터링이란</h3>
+      <p>InnoDB에서 <b>테이블 = PK B+Tree</b>예요. 리프 페이지에 행 데이터 전체가 PK 순으로 정렬돼 있어요. 그래서 "클러스터링 인덱스 = 테이블"이고, PK 조회는 인덱스를 찾으면 바로 데이터예요.</p>
+
+      <h3>세컨더리 인덱스는 PK를 들고 있다</h3>
+      <p>세컨더리 인덱스 리프에는 (인덱스 컬럼 값, <b>PK 값</b>)이 있어요. 행의 물리 위치가 아니에요. 이유: 페이지 분할로 행이 이동해도 세컨더리 인덱스를 안 고쳐도 되니까. 대가: 세컨더리 인덱스로 조회 → PK 얻음 → 클러스터링 인덱스 다시 탐색(2번 탐색). 그리고 <b>PK가 크면 모든 세컨더리 인덱스가 커져요</b>.</p>
+      <figure class="diagram">
+        <svg viewBox="0 0 640 170" role="img" aria-label="세컨더리 인덱스에서 클러스터링 인덱스 재탐색">
+          <text x="20" y="22" class="dg-tm">SELECT * FROM users WHERE name = 'kim'</text>
+          <rect x="20" y="35" width="240" height="95" rx="8" class="dg-box"/><text x="140" y="58" text-anchor="middle" class="dg-tb">세컨더리 인덱스 (name)</text>
+          <rect x="40" y="72" width="200" height="44" rx="4" class="dg-soft"/><text x="140" y="90" text-anchor="middle" class="dg-t">리프: ('kim', PK=42)</text><text x="140" y="106" text-anchor="middle" class="dg-tm">인덱스 컬럼 + PK만 있음</text>
+          <rect x="380" y="35" width="240" height="95" rx="8" class="dg-acc"/><text x="500" y="58" text-anchor="middle" class="dg-tb">클러스터링 인덱스 (PK)</text>
+          <rect x="400" y="72" width="200" height="44" rx="4" class="dg-soft"/><text x="500" y="90" text-anchor="middle" class="dg-t">리프: 행 전체 (42, 'kim', …)</text><text x="500" y="106" text-anchor="middle" class="dg-tm">= 테이블 그 자체</text>
+          <path d="M260 82 L378 82" class="dg-la"/><text x="319" y="74" text-anchor="middle" class="dg-ta">② PK=42로 재탐색</text>
+          <text x="20" y="155" class="dg-ta">① 1차 탐색 (name으로)</text><text x="380" y="155" class="dg-tm">② 2차 탐색 — 행마다 랜덤 I/O</text>
+        </svg>
+        <figcaption>필요한 컬럼이 전부 인덱스에 있으면(커버링) ②를 생략한다 → EXPLAIN의 Using index.</figcaption>
+      </figure>
+
+      <h3>PK 선택이 중요한 이유</h3>
+      <ul>
+        <li><b>순차 PK(AUTO_INCREMENT)</b>: 새 행은 항상 마지막 페이지에 → 페이지 분할 적고, 최근 페이지만 버퍼풀에 있으면 됨.</li>
+        <li><b>랜덤 PK(UUID v4)</b>: 새 행이 B-Tree 아무 곳에 → 페이지 분할 잦음, 모든 페이지가 쓰기 대상이라 버퍼풀 효율 저하, 단편화. 또 36바이트 문자열이면 세컨더리 인덱스마다 36바이트 추가.</li>
+        <li><b>PK 변경</b>: 행이 물리적으로 이동(삭제 + 삽입). 세컨더리 인덱스도 전부 갱신. PK는 바뀌지 않는 값으로.</li>
+      </ul>
+
+      <h3>클러스터링의 장단점</h3>
+      <div class="tbl"><table>
+        <tr><th>장점</th><th>단점</th></tr>
+        <tr><td>PK 조회 매우 빠름</td><td>세컨더리 인덱스 조회는 2번 탐색</td></tr>
+        <tr><td>PK 범위 조회 = 순차 I/O</td><td>PK가 크면 모든 인덱스가 커짐</td></tr>
+        <tr><td>세컨더리 인덱스가 PK를 포함 → 커버링 효과</td><td>INSERT 성능이 PK 순서에 좌우</td></tr>
+      </table></div>
+      <p>PostgreSQL은 다르게 동작해요. 힙 테이블에 행이 삽입 순으로 쌓이고 모든 인덱스(PK 포함)가 물리 위치(TID)를 가리켜요. 그래서 UUID PK의 삽입 비용 차이가 MySQL보다 작아요. 대신 행이 갱신되면 모든 인덱스를 갱신해야 해요(HOT 최적화 제외).</p>
+
+      <div class="backend"><b>백엔드에서는</b> UUID를 외부 식별자로 쓰고 싶다면 (1) 내부 PK는 BIGINT AUTO_INCREMENT, UUID는 별도 유니크 컬럼으로, 또는 (2) UUID v7/ULID를 <code>BINARY(16)</code>으로 저장(시간순 + 16바이트). JPA의 <code>@GeneratedValue(strategy = UUID)</code>는 v4라 위험해요. 그리고 "자주 같이 읽는 데이터를 PK 순서로 가깝게 두기"가 설계 포인트예요. 사용자의 주문을 자주 조회한다면 주문 PK를 (user_id, order_id) 복합으로 하면 한 사용자의 주문이 물리적으로 붙어 있어요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>InnoDB 테이블 = PK B+Tree, 세컨더리 인덱스 리프 = (키, PK)</li><li>PK는 작고 순차적이고 불변으로. UUID v4 PK는 분할·단편화·크기 문제</li><li>PostgreSQL은 힙 + TID라 다름</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>세컨더리 인덱스가 PK 대신 물리 주소를 저장하면 어떤 문제가 생기나요?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p>클러스터링 인덱스는 PK 순서를 유지하려고 페이지 분할 시 행을 옮겨요. 물리 주소를 저장했다면 행이 옮겨질 때마다 모든 세컨더리 인덱스의 해당 엔트리를 갱신해야 해요. PK를 저장하면 행이 어디로 가든 PK로 다시 찾을 수 있어 세컨더리 인덱스는 그대로예요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <!-- ================================================================ -->
+    <div class="part-title">1권 9장 옵티마이저와 힌트</div>
+
+    <section id="ch09-1" data-sec>
+      <h2>9.1~9.2 쿼리 실행 절차와 기본 데이터 처리</h2>
+      <p class="lead">풀 테이블 스캔, ORDER BY(filesort), GROUP BY, DISTINCT, 임시 테이블</p>
+
+      <h3>옵티마이저의 일</h3>
+      <p>같은 결과를 내는 실행 방법은 여러 개예요(어느 인덱스, 어느 테이블부터 조인, 정렬을 인덱스로 할지 따로 할지). 옵티마이저는 <b>통계</b>(테이블 행 수, 인덱스 카디널리티, 페이지 수)로 각 방법의 <b>비용</b>을 추정해 가장 싼 것을 골라요. 통계가 틀리면 계획이 틀려요. <code>ANALYZE TABLE</code>로 갱신하고, 8.0의 히스토그램(<code>ANALYZE TABLE ... UPDATE HISTOGRAM</code>)은 값 분포 편향까지 반영해요.</p>
+
+      <h3>풀 테이블 스캔</h3>
+      <p>옵티마이저가 선택하는 경우: 테이블이 아주 작음(페이지 1개), 조건에 맞는 인덱스 없음, 인덱스로 읽을 행이 전체의 20~25% 이상(인덱스 랜덤 I/O보다 순차 풀스캔이 쌈). InnoDB는 풀스캔 시 리드 어헤드로 페이지를 미리 읽어요.</p>
+
+      <h3>ORDER BY — 정렬 처리</h3>
+      <p>세 가지 방식, 성능 순:</p>
+      <ol>
+        <li><b>인덱스 사용</b>: ORDER BY 컬럼이 인덱스 순서와 같으면 읽은 순서가 곧 정렬. 추가 비용 없음. Extra에 아무 표시 없음.</li>
+        <li><b>조인에서 드라이빙 테이블만 정렬</b>: 첫 테이블을 정렬 후 조인. Extra: <code>Using filesort</code>.</li>
+        <li><b>임시 테이블 정렬</b>: 조인 결과를 임시 테이블에 넣고 정렬. Extra: <code>Using temporary; Using filesort</code>. 가장 느림.</li>
+      </ol>
+      <p><b>filesort</b>는 "파일 정렬"이 아니라 "인덱스 없이 정렬"이에요. <code>sort_buffer_size</code> 안에서 메모리 정렬, 넘치면 디스크에 쪼개 쓰고 병합(실제 파일). 정렬 대상이 크면 느려요. 정렬 대상 레코드를 줄이려면 WHERE로 먼저 거르고, 컬럼 수도 줄이세요(SELECT *는 정렬 버퍼를 낭비).</p>
+      <p><b>LIMIT과 정렬</b>: <code>ORDER BY x LIMIT 10</code>은 전체를 정렬한 뒤 10개 자르는 게 아니라 우선순위 큐로 상위 10개만 유지해요. 그래도 전체를 <b>읽기는</b> 해요. 인덱스로 정렬하면 10개만 읽고 끝나요.</p>
+
+      <h3>GROUP BY</h3>
+      <ul>
+        <li><b>인덱스 사용(타이트 스캔)</b>: GROUP BY 컬럼이 인덱스 순이면 읽으면서 그룹핑. 추가 비용 없음.</li>
+        <li><b>루스 인덱스 스캔</b>: 인덱스의 유니크 값마다 건너뛰며. Extra: <code>Using index for group-by</code>.</li>
+        <li><b>임시 테이블</b>: 인덱스 못 쓰면. Extra: <code>Using temporary</code>. 8.0부터 GROUP BY가 암묵적 정렬을 안 해요(정렬 필요하면 ORDER BY 명시).</li>
+      </ul>
+
+      <h3>DISTINCT</h3>
+      <p><code>SELECT DISTINCT a, b</code>는 (a, b) 조합의 유일. <code>COUNT(DISTINCT a)</code>는 임시 테이블로 중복 제거. 조인 후 DISTINCT는 조인 결과 전체를 임시 테이블에 넣어야 해서 비싸요. 세미 조인(EXISTS)으로 바꿀 수 있는지 보세요.</p>
+
+      <h3>내부 임시 테이블</h3>
+      <p>메모리(TempTable 엔진, <code>temptable_max_ram</code>)에 만들다가 넘치면 디스크로. 필요한 경우: ORDER BY와 GROUP BY 컬럼이 다름, 조인 결과를 정렬/그룹핑, DISTINCT + ORDER BY, UNION(ALL 제외), 파생 테이블. Extra: <code>Using temporary</code>.</p>
+
+      <div class="backend"><b>백엔드에서는</b> 페이징 쿼리 <code>ORDER BY created_at DESC LIMIT 20 OFFSET 100000</code>은 100,020건을 읽고 버려요. 뒤 페이지로 갈수록 느려져요. <b>커서(키셋) 페이징</b>: <code>WHERE created_at < :last AND id < :lastId ORDER BY created_at DESC, id DESC LIMIT 20</code>으로 인덱스 범위 스캔만 하게 하세요. 또 Extra에 <code>Using temporary; Using filesort</code>가 같이 뜨면 거의 항상 튜닝 대상이에요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>옵티마이저 = 통계 기반 비용 추정. 통계 갱신 중요</li><li>정렬·그룹핑은 인덱스 순서로 처리되는 게 최선, 아니면 filesort/임시 테이블</li><li>OFFSET 페이징은 뒤로 갈수록 느림 → 커서 페이징</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>인덱스가 있는데 옵티마이저가 풀 테이블 스캔을 고르는 게 합리적인 경우는?</li><li><code>Using filesort</code>가 떴을 때 가장 먼저 시도할 두 가지는?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p><b>1.</b> 조건에 맞는 행이 전체의 20~25% 이상일 때. 인덱스로 가면 그 행마다 랜덤 I/O(클러스터링 인덱스 재탐색)인데, 풀스캔은 순차 I/O라 전체를 읽어도 더 빨라요. 테이블이 아주 작을 때도 그래요.</p>
+          <p><b>2.</b> (1) ORDER BY 컬럼을 포함하는 인덱스를 WHERE 조건과 함께 설계해 인덱스 순서로 읽히게 하기. (2) WHERE로 정렬 대상 행 수를 줄이고 SELECT 컬럼을 줄여 정렬 버퍼 부담을 낮추기.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <section id="ch09-3" data-sec>
+      <h2>9.3 고급 최적화 — 조인과 서브쿼리</h2>
+      <p class="lead">네스티드 루프, 해시 조인, 세미 조인, ICP, MRR</p>
+
+      <h3>네스티드 루프 조인</h3>
+      <p>MySQL의 기본. 드라이빙(첫) 테이블을 읽고, 각 행마다 드리븐(둘째) 테이블을 조인 조건으로 찾아요. <b>드리븐 테이블의 조인 컬럼에 인덱스가 필수</b>예요. 없으면 드라이빙 행 수 × 드리븐 풀스캔. 옵티마이저는 보통 행 수가 적은 쪽을 드라이빙으로 골라요(인덱스가 한쪽에만 있으면 없는 쪽이 드라이빙).</p>
+      <p><b>블록 네스티드 루프</b>: 드리븐에 인덱스가 없을 때 드라이빙 행들을 조인 버퍼에 모아 드리븐을 한 번만 스캔. Extra: <code>Using join buffer</code>. 8.0.18+는 대신 <b>해시 조인</b>을 써요(동등 조인에서 인덱스 없을 때 훨씬 빠름).</p>
+
+      <h3>조인 순서와 OUTER JOIN</h3>
+      <p>INNER JOIN은 옵티마이저가 순서를 바꿀 수 있지만, LEFT JOIN은 왼쪽이 드라이빙으로 고정돼요. 불필요한 LEFT JOIN은 INNER로 바꾸면 최적화 여지가 커져요. 또 <code>LEFT JOIN b ... WHERE b.col = ?</code>는 사실상 INNER JOIN이에요(b가 NULL이면 걸러지니까).</p>
+
+      <h3>서브쿼리 최적화</h3>
+      <ul>
+        <li><b>세미 조인</b>: <code>WHERE id IN (SELECT ...)</code>, <code>EXISTS</code>를 조인처럼 처리. 8.0은 Table Pull-out, Duplicate Weed-out, First Match, Loose Scan, Materialization 중 선택. 옛 버전처럼 "IN 서브쿼리는 느리다"는 이제 대부분 아니에요.</li>
+        <li><b>안티 세미 조인</b>: <code>NOT IN</code>, <code>NOT EXISTS</code>. 8.0.17+ 최적화. 단 <code>NOT IN</code>은 서브쿼리에 NULL이 하나라도 있으면 결과가 전부 빈 집합이에요(SQL 3값 논리). <code>NOT EXISTS</code>가 안전.</li>
+        <li><b>파생 테이블</b>(FROM 절 서브쿼리): 8.0은 외부 쿼리에 병합(merge)하거나 임시 테이블화. 병합되면 인덱스를 쓸 수 있어요.</li>
+      </ul>
+
+      <h3>ICP (Index Condition Pushdown)</h3>
+      <p>인덱스에 있는 컬럼의 조건은 스토리지 엔진이 인덱스 단계에서 걸러서 불필요한 테이블 읽기를 줄여요. <code>INDEX (last_name, first_name)</code>에 <code>WHERE last_name = 'A' AND first_name LIKE '%b'</code>면, 옛날엔 last_name으로 찾은 행을 전부 테이블에서 읽고 first_name을 검사했지만, ICP는 인덱스에서 first_name 조건까지 확인하고 통과한 것만 테이블을 읽어요. Extra: <code>Using index condition</code>.</p>
+
+      <h3>MRR과 BKA</h3>
+      <p><b>MRR</b>(Multi-Range Read): 세컨더리 인덱스로 얻은 PK들을 정렬해서 클러스터링 인덱스를 순차로 읽어요. 랜덤 I/O → 순차 I/O. <b>BKA</b>(Batched Key Access): 조인에서 MRR을 활용. 기본은 꺼져 있고 효과는 상황에 따라.</p>
+
+      <h3>옵티마이저 힌트</h3>
+      <p><code>SELECT /*+ INDEX(t idx_name) */</code>, <code>JOIN_ORDER</code>, <code>NO_ICP</code> 등. 통계가 잘못됐거나 옵티마이저가 명백히 틀릴 때만. 힌트는 데이터 분포가 바뀌면 독이 돼요. 인덱스 힌트(<code>USE INDEX</code>, <code>FORCE INDEX</code>)보다 옵티마이저 힌트가 유연해요.</p>
+
+      <div class="backend"><b>백엔드에서는</b> JPA의 N+1이 바로 "애플리케이션 레벨 네스티드 루프 조인"이에요. 주문 100건 조회 후 각 주문의 사용자를 100번 쿼리. DB 조인(fetch join)이나 IN 절 배치 로딩(<code>default_batch_fetch_size</code>)으로 바꾸면 100번 왕복이 1~2번이 돼요. 네트워크 RTT를 생각하면 DB 안의 네스티드 루프보다 수백 배 느려요. 그리고 <code>NOT IN</code> + NULL 함정은 실무에서 "결과가 갑자기 0건"으로 나타나요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>네스티드 루프: 드리븐 조인 컬럼 인덱스 필수. 없으면 해시 조인</li><li>IN/EXISTS는 세미 조인으로 최적화됨. NOT IN + NULL 주의</li><li>ICP = 인덱스 단계에서 필터, MRR = PK 정렬 후 순차 읽기</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>A(1만 건) JOIN B(100만 건), 조인 컬럼 인덱스는 B에만. 어느 쪽이 드라이빙이 되고 왜?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p>A가 드라이빙. A를 풀스캔(1만 건)하며 각 행에 대해 B를 인덱스로 찾아요(1만 번 인덱스 탐색). 반대로 B가 드라이빙이면 100만 번 A를 찾아야 하는데 A엔 인덱스가 없어 매번 풀스캔이에요. 옵티마이저는 인덱스가 없는 쪽을 드라이빙으로 선호해요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <!-- ================================================================ -->
+    <div class="part-title">1권 10장 실행 계획</div>
+
+    <section id="ch10" data-sec>
+      <h2>10장 실행 계획 읽기</h2>
+      <p class="lead">EXPLAIN의 각 컬럼이 말하는 것</p>
+
+      <h3>기본</h3>
+<pre><code>EXPLAIN SELECT ...;              -- 표 형식
+EXPLAIN FORMAT=TREE SELECT ...;  -- 8.0 트리 형식, 읽기 쉬움
+EXPLAIN ANALYZE SELECT ...;      -- 실제 실행하고 실측 시간·행 수 (8.0.18+)</code></pre>
+      <p><code>EXPLAIN ANALYZE</code>는 추정이 아니라 실측이라 "옵티마이저는 100행 예상했는데 실제 10만 행" 같은 통계 오류를 잡아요.</p>
+
+      <h3>컬럼별 의미</h3>
+      <div class="tbl"><table>
+        <tr><th>컬럼</th><th>의미</th><th>볼 것</th></tr>
+        <tr><td>id</td><td>SELECT 단위 번호. 같으면 조인, 다르면 서브쿼리/UNION</td><td>실행 순서는 id 순이 아니라 위→아래</td></tr>
+        <tr><td>select_type</td><td>SIMPLE, PRIMARY, SUBQUERY, DERIVED, DEPENDENT SUBQUERY, MATERIALIZED...</td><td><b>DEPENDENT SUBQUERY</b>는 외부 행마다 실행 → 느림</td></tr>
+        <tr><td>table</td><td>테이블명 또는 &lt;derived2&gt;, &lt;subquery2&gt;</td><td></td></tr>
+        <tr><td>partitions</td><td>접근한 파티션</td><td>파티션 프루닝 확인</td></tr>
+        <tr><td><b>type</b></td><td>접근 방식. 좋은 순: system > const > eq_ref > ref > fulltext > ref_or_null > range > index_merge > unique_subquery > index_subquery > <b>range</b> > <b>index</b> > <b>ALL</b></td><td>index = 인덱스 풀스캔, ALL = 테이블 풀스캔. 둘 다 큰 테이블이면 문제</td></tr>
+        <tr><td>possible_keys</td><td>후보 인덱스</td><td>참고만</td></tr>
+        <tr><td><b>key</b></td><td>실제 사용 인덱스</td><td>NULL이면 인덱스 없이</td></tr>
+        <tr><td>key_len</td><td>사용한 인덱스 키 바이트 수</td><td>복합 인덱스 중 <b>몇 컬럼까지</b> 썼는지 추정. INT 4, VARCHAR(100) utf8mb4 = 402, NULL 가능 +1</td></tr>
+        <tr><td>ref</td><td>인덱스와 비교한 값/컬럼</td><td>func면 값이 변환됨(타입 불일치 의심)</td></tr>
+        <tr><td><b>rows</b></td><td>읽을 것으로 예상하는 행 수</td><td>실제와 크게 다르면 통계 문제</td></tr>
+        <tr><td>filtered</td><td>읽은 행 중 조건 통과 비율(%)</td><td>낮으면 인덱스로 못 거르고 읽은 뒤 버림</td></tr>
+        <tr><td><b>Extra</b></td><td>부가 정보</td><td>아래 표</td></tr>
+      </table></div>
+
+      <h3>Extra 핵심</h3>
+      <div class="tbl"><table>
+        <tr><th>값</th><th>의미</th><th>판단</th></tr>
+        <tr><td><code>Using index</code></td><td><b>커버링 인덱스</b>. 테이블 안 읽음</td><td>매우 좋음</td></tr>
+        <tr><td><code>Using index condition</code></td><td>ICP 적용</td><td>좋음</td></tr>
+        <tr><td><code>Using where</code></td><td>스토리지 엔진이 읽은 행을 MySQL 엔진이 다시 필터</td><td>filtered 낮으면 인덱스 보강</td></tr>
+        <tr><td><code>Using filesort</code></td><td>인덱스 못 쓰고 정렬</td><td>대상 크면 튜닝</td></tr>
+        <tr><td><code>Using temporary</code></td><td>임시 테이블 생성</td><td>filesort와 함께면 튜닝</td></tr>
+        <tr><td><code>Using join buffer (hash join)</code></td><td>드리븐 인덱스 없음</td><td>조인 컬럼 인덱스 검토</td></tr>
+        <tr><td><code>Using index for group-by</code></td><td>루스 인덱스 스캔</td><td>좋음</td></tr>
+        <tr><td><code>Impossible WHERE</code>, <code>No matching row</code></td><td>조건상 결과 없음</td><td>쿼리 확인</td></tr>
+        <tr><td><code>Select tables optimized away</code></td><td>MIN/MAX 등 인덱스로 즉시</td><td>매우 좋음</td></tr>
+      </table></div>
+
+      <h3>읽는 순서</h3>
+      <ol>
+        <li>type이 ALL/index인 큰 테이블이 있나 → 인덱스 검토</li>
+        <li>rows × filtered로 실제 처리량 추정, 조인이면 곱셈</li>
+        <li>Extra에 filesort/temporary → 정렬·그룹핑 인덱스 검토</li>
+        <li>key_len으로 복합 인덱스를 끝까지 썼는지</li>
+        <li>EXPLAIN ANALYZE로 추정 vs 실측 비교</li>
+      </ol>
+
+      <div class="backend"><b>백엔드에서는</b> 슬로우 쿼리 로그(<code>long_query_time=1</code>)를 켜고 <code>pt-query-digest</code>로 집계해 상위 쿼리부터 EXPLAIN하세요. 느린 쿼리 10개 중 8개는 (1) 인덱스 없음/못 씀, (2) filesort+temporary, (3) N+1이에요. 운영 DB에서 EXPLAIN은 안전해요(실행 안 함). EXPLAIN ANALYZE는 실제 실행하니 UPDATE/DELETE엔 트랜잭션 안에서 롤백하거나 replica에서.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>type(ALL/index 주의), key, rows·filtered, Extra가 핵심</li><li>Using index = 커버링(최고), filesort+temporary = 튜닝 대상</li><li>EXPLAIN ANALYZE로 추정과 실측 비교</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>type=ref, rows=10000, filtered=1.00, Extra=Using where. 무슨 뜻이고 어떻게 고치나요?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p>인덱스로 1만 행을 읽었는데 그중 1%(100행)만 WHERE를 통과했어요. 인덱스가 조건 일부만 걸러주고 나머지는 테이블을 읽은 뒤 버리는 거예요. WHERE의 나머지 조건 컬럼을 인덱스에 추가(복합 인덱스)하면 인덱스 단계에서 100행만 읽어요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <!-- ================================================================ -->
+    <div class="part-title">1권 11장 쿼리 작성 및 최적화</div>
+
+    <section id="ch11-1" data-sec>
+      <h2>11.1~11.4 SELECT 작성 시 주의사항</h2>
+      <p class="lead">인덱스를 살리는 WHERE, 날짜·문자열·NULL 비교, 페이징</p>
+
+      <h3>인덱스 컬럼을 변형하지 마라</h3>
+<pre><code>-- X: 컬럼에 함수 → 인덱스 불가
+WHERE DATE(created_at) = '2024-01-15'
+WHERE YEAR(created_at) = 2024
+WHERE LOWER(email) = 'a@b.com'
+WHERE salary * 12 >= 50000000
+
+-- O: 리터럴 쪽을 변형
+WHERE created_at >= '2024-01-15' AND created_at < '2024-01-16'
+WHERE created_at >= '2024-01-01' AND created_at < '2025-01-01'
+WHERE email = 'a@b.com'       -- 콜레이션이 ci면 대소문자 무관
+WHERE salary >= 50000000 / 12</code></pre>
+      <p>정말 함수가 필요하면 <b>함수 기반 인덱스</b>(8.0)나 생성 컬럼에 인덱스.</p>
+
+      <h3>타입과 콜레이션</h3>
+      <ul>
+        <li>문자열 컬럼 vs 숫자 리터럴 → 컬럼이 변환돼 인덱스 불가(8장).</li>
+        <li>조인 컬럼의 타입·문자셋·콜레이션이 다르면 변환이 필요해 인덱스 불가. 테이블 간 FK 컬럼은 반드시 같은 정의로.</li>
+        <li>날짜: DATETIME 컬럼에 문자열 <code>'2024-01-15'</code>는 자동 변환되어 OK. 반대로 문자열 컬럼에 날짜 함수는 X.</li>
+      </ul>
+
+      <h3>NULL</h3>
+      <p><code>NULL = NULL</code>은 NULL(거짓도 참도 아님). <code>col = NULL</code>은 아무것도 안 나와요. <code>IS NULL</code>로. <code>NOT IN (서브쿼리)</code>에 NULL이 섞이면 전체 결과가 빈 집합(9장). 집계 함수는 NULL을 무시하지만 <code>COUNT(*)</code>는 행 수. <code>COUNT(col)</code>은 NULL 아닌 수.</p>
+
+      <h3>LIMIT과 페이징</h3>
+      <ul>
+        <li><code>LIMIT n OFFSET m</code>은 m+n건 읽고 m건 버림. 큰 OFFSET은 느림.</li>
+        <li><b>커서 페이징</b>: 마지막 본 값을 조건으로. <code>WHERE (created_at, id) < (:last_at, :last_id) ORDER BY created_at DESC, id DESC LIMIT 20</code>. 인덱스 (created_at, id) 필요. 정렬 키는 유일해야(동점 처리 위해 id 추가).</li>
+        <li><b>COUNT(*) 전체 건수</b>: InnoDB는 MVCC 때문에 전체를 세요. 큰 테이블에선 느림. 근사치(<code>information_schema.TABLES.TABLE_ROWS</code>)나 카운터 테이블, 또는 "다음 페이지 있음"만 보여주기.</li>
+      </ul>
+
+      <h3>SELECT *</h3>
+      <p>필요한 컬럼만. 커버링 인덱스 가능성이 생기고, 정렬 버퍼·네트워크·메모리가 줄어요. TEXT/BLOB 컬럼이 있으면 특히.</p>
+
+      <h3>그 외</h3>
+      <ul>
+        <li><code>OR</code> 조건은 각각 인덱스가 있으면 index_merge, 없으면 풀스캔. UNION ALL로 나누는 게 나을 때도.</li>
+        <li><code>LIKE '%x%'</code>는 전문 검색(FULLTEXT) 또는 Elasticsearch.</li>
+        <li>조인 조건과 필터 조건을 ON과 WHERE에 적절히. OUTER JOIN에서 WHERE에 드리븐 조건을 쓰면 INNER로 바뀜.</li>
+      </ul>
+
+      <div class="backend"><b>백엔드에서는</b> QueryDSL/JPQL이 만드는 SQL도 결국 이 규칙을 따라요. 특히 ORM이 생성하는 <code>WHERE DATE(...)</code>, 타입 변환, 불필요한 LEFT JOIN을 로그로 확인하세요. 커서 페이징은 "무한 스크롤"의 표준이고, 관리자 화면의 "N페이지로 이동"은 OFFSET이 필요하지만 그 화면은 트래픽이 적으니 허용해요. 용도에 맞게.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>컬럼 변형 금지, 리터럴을 변형. 타입·콜레이션 일치</li><li>NULL은 IS NULL, NOT IN + NULL 주의</li><li>OFFSET → 커서 페이징, SELECT * → 필요한 컬럼</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li><code>WHERE YEAR(order_date) = 2024 AND MONTH(order_date) = 3</code>을 인덱스를 쓰도록 고치세요.</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p><code>WHERE order_date >= '2024-03-01' AND order_date < '2024-04-01'</code>. 반열린 구간으로 쓰면 시간 부분과 월말 일수를 신경 안 써도 돼요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <section id="ch11-2" data-sec>
+      <h2>11.5~11.7 INSERT, UPDATE, DELETE, 스키마 조작</h2>
+      <p class="lead">쓰기 쿼리의 성능과 안전, 그리고 운영 중 DDL</p>
+
+      <h3>INSERT</h3>
+      <ul>
+        <li><b>다중 행 INSERT</b>: <code>INSERT INTO t VALUES (...), (...), (...)</code>. 한 건씩 1000번보다 1000건 한 번이 수십 배 빠름(왕복, 파싱, 로그 fsync 절약). JDBC <code>rewriteBatchedStatements=true</code>가 이걸 만들어요.</li>
+        <li><b>PK 순서</b>: 8장. AUTO_INCREMENT면 자동으로 순차. 벌크 로드 시엔 PK 순으로 정렬해서 넣기.</li>
+        <li><b>INSERT ... ON DUPLICATE KEY UPDATE</b>: upsert. 유니크 키 충돌 시 갱신. <code>INSERT IGNORE</code>는 충돌 무시(경고만). 경쟁 조건 없이 "없으면 넣고 있으면 갱신"을 원자적으로.</li>
+        <li><b>INSERT ... SELECT</b>: 소스 테이블에 공유 락(RR에서) → 큰 테이블이면 주의. RC나 바이너리 로그 ROW 포맷이면 완화.</li>
+      </ul>
+
+      <h3>UPDATE / DELETE</h3>
+      <ul>
+        <li><b>WHERE에 인덱스</b>: 5장. 없으면 테이블 전체 잠금.</li>
+        <li><b>대량 변경은 나눠서</b>: 100만 건 DELETE 한 번 = 100만 행 락 + 거대한 언두 + 복제 지연. <code>DELETE ... LIMIT 1000</code>을 반복, 사이에 짧은 sleep.</li>
+        <li><b>UPDATE ... ORDER BY ... LIMIT</b>: 순서대로 일부만. 배치 처리에.</li>
+        <li><b>조인 UPDATE/DELETE</b>: <code>UPDATE a JOIN b ON ... SET a.x = b.y</code>. 다른 테이블 기준 갱신.</li>
+        <li><b>자기 테이블 서브쿼리</b>: <code>DELETE FROM t WHERE id IN (SELECT id FROM t ...)</code>는 MySQL이 금지. 파생 테이블로 한 번 감싸거나 조인으로.</li>
+      </ul>
+
+      <h3>스키마 조작 (DDL)</h3>
+      <p>8.0 <b>온라인 DDL</b>: 많은 ALTER가 DML을 막지 않고 진행돼요. 알고리즘:</p>
+      <ul>
+        <li><b>INSTANT</b>: 메타데이터만 변경, 즉시. 컬럼 끝에 추가(8.0.12+), 기본값 변경 등.</li>
+        <li><b>INPLACE</b>: 테이블 재구성 없이(또는 있어도 DML 허용). 인덱스 추가/삭제 등. 중간에 DML 로그를 쌓았다가 마지막에 적용.</li>
+        <li><b>COPY</b>: 새 테이블에 복사. DML 차단. 컬럼 타입 변경 등.</li>
+      </ul>
+      <p><code>ALTER TABLE ... ALGORITHM=INSTANT, LOCK=NONE</code>으로 명시하면 안 되는 경우 에러로 알려줘서 안전해요. 그리고 5.2장 MDL 문제는 어떤 알고리즘이든 시작·끝에 잠깐 필요하니 긴 트랜잭션 확인은 필수.</p>
+      <p>큰 테이블의 COPY DDL은 <b>pt-online-schema-change</b>나 <b>gh-ost</b>로: 새 테이블 생성 → 트리거/binlog로 변경 추적하며 복사 → 원자적 RENAME.</p>
+
+      <div class="backend"><b>백엔드에서는</b> JPA <code>saveAll()</code>은 기본적으로 한 건씩 INSERT예요. <code>hibernate.jdbc.batch_size</code> + <code>rewriteBatchedStatements=true</code> + ID 생성 전략이 IDENTITY가 아니어야(IDENTITY는 즉시 INSERT 필요) 배치가 돼요. 마이그레이션 도구(Flyway)로 DDL을 배포하면서 <code>ALGORITHM=INSTANT</code>를 명시하는 습관을 들이세요. "컬럼 추가는 안전, 타입 변경·NOT NULL 추가·인덱스 추가는 크기 확인" 정도의 규칙을 팀에 두세요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>INSERT는 다중 행으로, PK 순으로, upsert는 ON DUPLICATE KEY UPDATE</li><li>대량 UPDATE/DELETE는 LIMIT으로 쪼개서</li><li>DDL은 INSTANT/INPLACE 명시, 긴 트랜잭션 확인, 큰 테이블은 online schema change 도구</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>3년 지난 로그 5천만 건을 운영 중 삭제해야 해요. 방법은?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p>(1) 인덱스가 있는 컬럼(created_at 또는 PK 범위) 조건으로 <code>DELETE ... LIMIT 5000</code>을 반복, 사이에 100ms sleep, 복제 지연 모니터링하며. (2) 더 좋은 건 처음부터 날짜 파티션을 두고 <code>ALTER TABLE ... DROP PARTITION</code>(13장)으로 즉시 삭제. (3) 남길 데이터가 적으면 새 테이블에 복사 후 RENAME 교체. 한 번에 DELETE하면 수십 분 락 + 언두 폭증 + 복제 지연.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <!-- ================================================================ -->
+    <div class="part-title">1권 13장 파티션</div>
+
+    <section id="ch13" data-sec>
+      <h2>13장 파티션</h2>
+      <p class="lead">하나의 테이블을 여러 물리 조각으로 — 언제 도움이 되고 언제 독인가</p>
+
+      <h3>개념</h3>
+      <p>논리적으로 하나의 테이블을 <b>같은 서버 안에서</b> 여러 물리 테이블(파티션)로 나눠요. 샤딩(여러 서버)과 달라요. 각 파티션은 자기 B-Tree를 가져요.</p>
+
+      <h3>종류</h3>
+      <ul>
+        <li><b>RANGE</b>: 값 범위. <code>PARTITION BY RANGE (YEAR(created_at))</code>. 로그·이력 테이블의 표준. 오래된 파티션을 <b>DROP PARTITION</b>으로 즉시 삭제.</li>
+        <li><b>LIST</b>: 값 목록. 지역 코드별 등.</li>
+        <li><b>HASH / KEY</b>: 해시로 균등 분산. 특정 파티션만 읽는 효과는 PK 조회에서만.</li>
+      </ul>
+
+      <h3>제약</h3>
+      <ul>
+        <li><b>파티션 키는 PK와 모든 유니크 키에 포함</b>돼야 해요. (파티션 간 유일성 검사를 못 하니까) → PK가 (id, created_at)이 되고, id만으로 유니크를 보장 못 해요.</li>
+        <li>외래키 불가.</li>
+        <li>파티션 키 조건이 없는 쿼리는 <b>모든 파티션을 각각 탐색</b>(파티션 프루닝 실패). 파티션이 100개면 인덱스 탐색 100번. 오히려 느려요.</li>
+        <li>파티션마다 인덱스가 따로라 ORDER BY LIMIT도 각 파티션에서 읽어 병합.</li>
+      </ul>
+
+      <h3>언제 쓰나</h3>
+      <p>(1) 시간 기준으로 오래된 데이터를 통째로 지우는 테이블(로그, 이벤트, 알림), (2) 대부분의 쿼리가 파티션 키(날짜)를 조건으로 갖는 테이블. 이 둘이 아니면 대개 인덱스 설계가 답이에요. "테이블이 크니까 파티션"은 틀린 이유예요. B-Tree는 크기에 로그 비례라 1억 건도 높이 4예요.</p>
+
+      <div class="backend"><b>백엔드에서는</b> 파티션 테이블의 PK가 복합키가 되면서 JPA 매핑(<code>@IdClass</code>)이 번거로워지고, "id로 조회"가 모든 파티션을 뒤지게 돼요. 시간 기반 삭제가 목적이라면 애플리케이션 조회 패턴에 항상 날짜 조건을 넣을 수 있는지 먼저 확인하세요. 안 되면 파티션 대신 월별 테이블 + 배치 DROP, 또는 아카이빙 배치가 현실적일 수 있어요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>파티션 = 같은 서버 안 물리 분할, DROP PARTITION이 최대 장점</li><li>파티션 키가 PK·유니크에 포함, 조건에 없으면 전 파티션 탐색</li><li>시간 기반 삭제 + 쿼리에 날짜 조건이 있을 때만</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>파티션이 쿼리를 오히려 느리게 하는 경우는?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p>WHERE에 파티션 키가 없을 때. 옵티마이저가 어느 파티션인지 몰라 모든 파티션의 인덱스를 각각 탐색하고 결과를 병합해요. 파티션 수만큼 I/O가 늘어요. 또 유니크 제약이 파티션 키를 포함해야 해서 설계가 꼬이고, 파티션별 인덱스가 메모리를 더 써요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <!-- ================================================================ -->
+    <div class="part-title">2권 15장 데이터 타입</div>
+
+    <section id="ch15" data-sec>
+      <h2>15장 데이터 타입</h2>
+      <p class="lead">문자열, 숫자, 날짜, JSON — 타입 선택이 저장 공간과 인덱스와 버그를 결정한다</p>
+
+      <h3>문자열: CHAR vs VARCHAR</h3>
+      <p>CHAR(10)은 항상 10문자 공간(utf8mb4면 40바이트 예약), VARCHAR는 실제 길이 + 길이 바이트(1~2). 길이가 거의 고정이고 자주 바뀌면 CHAR(변경 시 페이지 내 이동 없음), 아니면 VARCHAR. VARCHAR(255)와 VARCHAR(20)은 저장은 같지만 <b>메모리 정렬·임시 테이블에서는 선언 길이만큼 할당</b>해요. 필요한 만큼만 선언하세요. TEXT는 별도 페이지(off-page)에 저장될 수 있어 조회 비용이 커요.</p>
+
+      <h3>문자셋과 콜레이션</h3>
+      <p>8.0 기본 <code>utf8mb4</code>(이모지 포함 4바이트). <code>utf8</code>(=utf8mb3)은 3바이트까지라 이모지 저장 시 에러. <b>콜레이션</b>은 비교·정렬 규칙: <code>utf8mb4_0900_ai_ci</code>(악센트·대소문자 무시, 기본), <code>utf8mb4_bin</code>(바이트 비교). 조인·비교하는 컬럼은 콜레이션이 같아야 인덱스를 써요. 대소문자 구분이 필요한 값(토큰, base64)은 bin.</p>
+
+      <h3>숫자</h3>
+      <ul>
+        <li>정수: TINYINT(1B) ~ BIGINT(8B). ID는 BIGINT(INT는 21억에서 끝남 — 실제 사고 많음).</li>
+        <li><b>DECIMAL</b>: 정확한 소수. 돈은 반드시 DECIMAL. FLOAT/DOUBLE은 근사값이라 0.1 + 0.2 ≠ 0.3.</li>
+        <li>BOOLEAN = TINYINT(1).</li>
+      </ul>
+
+      <h3>날짜와 시간</h3>
+      <ul>
+        <li><b>DATETIME</b>: 8바이트(8.0은 5+소수), 타임존 없이 입력 그대로 저장. 1000~9999년.</li>
+        <li><b>TIMESTAMP</b>: 4바이트, UTC로 저장하고 세션 타임존으로 변환해서 보여줌. <b>2038년 1월까지</b>. 타임존 변환이 자동이라 편하지만 커넥션 타임존 설정에 따라 값이 달라 보여서 혼란의 원인.</li>
+        <li>권장: 서버와 커넥션 타임존을 UTC로 통일하고 DATETIME에 UTC 저장, 표시 시 애플리케이션에서 변환. JDBC <code>serverTimezone</code>/<code>connectionTimeZone</code> 확인.</li>
+        <li><code>DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP</code>로 created_at/updated_at 자동화.</li>
+      </ul>
+
+      <h3>ENUM, SET</h3>
+      <p>ENUM은 내부적으로 정수 저장이라 작고 빠르지만, 값 추가 시 ALTER(끝에 추가는 INSTANT). 정렬이 문자열이 아니라 정의 순서. 코드 테이블이나 애플리케이션 enum + VARCHAR/TINYINT가 더 유연해요.</p>
+
+      <h3>JSON</h3>
+      <p>바이너리로 저장, 경로 접근(<code>->></code>) 가능. 유연하지만 (1) 인덱스는 생성 컬럼이나 멀티 밸류 인덱스를 통해서만, (2) 부분 갱신이 제한적, (3) 스키마가 코드에만 있어 관리 어려움. 정말 스키마가 가변적인 부가 속성에만. 자주 조건으로 쓰는 값은 컬럼으로 빼세요.</p>
+
+      <div class="backend"><b>백엔드에서는</b> 타임존 버그는 (1) MySQL 서버 타임존, (2) JDBC 커넥션 타임존, (3) JVM 기본 타임존, (4) 애플리케이션 변환 네 곳이 어긋나서 생겨요. 전부 UTC로 고정하고 <code>SELECT NOW(), @@session.time_zone</code>로 확인하세요. INT ID 고갈은 "어느 날 갑자기 INSERT 실패"로 나타나는 시한폭탄이에요. 지금 확인하세요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>VARCHAR는 필요한 길이만, utf8mb4, 비교 컬럼은 콜레이션 통일</li><li>ID는 BIGINT, 돈은 DECIMAL</li><li>DATETIME + UTC 통일, TIMESTAMP는 2038 한계</li><li>JSON은 부가 속성만, 조건 컬럼은 분리</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>DATETIME과 TIMESTAMP의 차이와 선택 기준은?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p>TIMESTAMP는 UTC로 저장하고 세션 타임존으로 자동 변환, 4바이트, 2038년까지. DATETIME은 변환 없이 그대로 저장, 더 넓은 범위. 세션 타임존이 제각각이면 TIMESTAMP 값이 다르게 보여 혼란이 생겨요. 권장은 모든 레이어 UTC 통일 + DATETIME. 2038 문제도 피해요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <!-- ================================================================ -->
+    <div class="part-title">2권 16장 복제</div>
+
+    <section id="ch16-1" data-sec>
+      <h2>16.1~16.3 복제 아키텍처와 타입</h2>
+      <p class="lead">바이너리 로그, I/O·SQL 스레드, 바이너리 로그 위치 vs GTID</p>
+
+      <h3>왜 복제하나</h3>
+      <p>(1) 스케일 아웃: 읽기를 replica로 분산, (2) 백업: replica에서 백업해 source 부담 없이, (3) 분석 쿼리 격리, (4) 고가용성: source 장애 시 replica 승격.</p>
+
+      <h3>아키텍처</h3>
+      <figure class="diagram">
+        <svg viewBox="0 0 640 215" role="img" aria-label="MySQL 복제 아키텍처">
+          <rect x="20" y="30" width="230" height="170" rx="8" class="dg-none"/><text x="30" y="48" class="dg-tb">Source</text>
+          <rect x="40" y="60" width="190" height="34" rx="5" class="dg-box"/><text x="135" y="82" text-anchor="middle" class="dg-t">트랜잭션 커밋</text>
+          <rect x="40" y="112" width="190" height="34" rx="5" class="dg-acc"/><text x="135" y="134" text-anchor="middle" class="dg-tb">바이너리 로그 (binlog)</text>
+          <rect x="40" y="162" width="190" height="28" rx="5" class="dg-soft"/><text x="135" y="181" text-anchor="middle" class="dg-tm">덤프 스레드</text>
+          <path d="M135 94 L135 110" class="dg-l"/><path d="M135 146 L135 160" class="dg-l"/>
+          <rect x="390" y="30" width="230" height="170" rx="8" class="dg-none"/><text x="400" y="48" class="dg-tb">Replica</text>
+          <rect x="410" y="60" width="190" height="30" rx="5" class="dg-box"/><text x="505" y="80" text-anchor="middle" class="dg-t">I/O 스레드</text>
+          <rect x="410" y="104" width="190" height="30" rx="5" class="dg-acc"/><text x="505" y="124" text-anchor="middle" class="dg-tb">릴레이 로그</text>
+          <rect x="410" y="148" width="190" height="30" rx="5" class="dg-box"/><text x="505" y="168" text-anchor="middle" class="dg-t">SQL (applier) 스레드 → 데이터</text>
+          <path d="M505 90 L505 102" class="dg-l"/><path d="M505 134 L505 146" class="dg-l"/>
+          <path d="M250 176 L320 176 L320 75 L408 75" class="dg-la"/><text x="326" y="130" class="dg-ta">binlog 이벤트</text><text x="326" y="145" class="dg-tm">(TCP, 비동기)</text>
+        </svg>
+        <figcaption>복제 지연 = Source 커밋 ~ Replica applier 적용 사이. GTID면 어느 Source에 붙어도 이어서 받는다.</figcaption>
+      </figure>
+      <ol>
+        <li>Source가 변경을 <b>바이너리 로그</b>에 기록 (커밋 시, 리두 로그와 2단계 커밋으로 일관성 유지)</li>
+        <li>Replica의 <b>I/O 스레드</b>가 Source에 접속해 바이너리 로그를 받아 <b>릴레이 로그</b>에 저장</li>
+        <li>Replica의 <b>SQL(applier) 스레드</b>가 릴레이 로그를 읽어 실행</li>
+      </ol>
+      <p>8.0은 applier를 여러 스레드로(<code>replica_parallel_workers</code>, LOGICAL_CLOCK) 병렬 적용해 지연을 줄여요.</p>
+
+      <h3>복제 타입: 위치 기반 vs GTID</h3>
+      <ul>
+        <li><b>바이너리 로그 위치 기반</b>: "파일 binlog.000123의 위치 4567부터". 서버마다 파일명·위치가 달라서 replica를 다른 source로 옮기거나 장애 조치 시 위치 계산이 복잡.</li>
+        <li><b>GTID</b>(Global Transaction ID): 트랜잭션마다 <code>server_uuid:번호</code>. 모든 서버에서 같은 트랜잭션은 같은 ID. "이 GTID까지 적용했다"로 어느 서버에 붙여도 자동으로 이어져요. <b>8.0 표준</b>, 장애 조치 자동화의 전제.</li>
+      </ul>
+
+      <div class="backend"><b>백엔드에서는</b> RDS/Aurora의 read replica, Aurora의 reader 엔드포인트가 이 구조예요(Aurora는 스토리지 공유라 지연이 훨씬 짧지만 원리는 같아요). 애플리케이션은 쓰기 DataSource와 읽기 DataSource를 나누고, <code>@Transactional(readOnly=true)</code>로 라우팅하는 게 흔한 구현이에요(<code>AbstractRoutingDataSource</code> 또는 JDBC <code>ReplicationDriver</code>).</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>binlog → I/O 스레드 → 릴레이 로그 → applier 스레드</li><li>GTID = 전역 트랜잭션 ID, 장애 조치와 토폴로지 변경의 표준</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>GTID가 위치 기반보다 장애 조치에 유리한 이유는?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p>source가 죽어 replica A를 승격하고 replica B를 A에 붙일 때, 위치 기반은 B가 옛 source의 어느 위치까지 받았는지를 A의 binlog 위치로 환산해야 해요(파일명·오프셋이 다름). GTID는 B가 "여기까지 적용"한 GTID 집합을 A에 알려주면 A가 그 다음부터 보내줘요. 자동이고 중복·누락이 없어요.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <section id="ch16-2" data-sec>
+      <h2>16.4~16.7 복제 포맷, 동기 방식, 토폴로지, 지연</h2>
+      <p class="lead">STATEMENT vs ROW, 비동기 vs 반동기, 그리고 복제 지연을 다루는 법</p>
+
+      <h3>바이너리 로그 포맷</h3>
+      <div class="tbl"><table>
+        <tr><th>포맷</th><th>기록 내용</th><th>장점</th><th>단점</th></tr>
+        <tr><td>STATEMENT</td><td>실행한 SQL 문</td><td>로그 작음</td><td>비결정적 함수(NOW(), UUID(), LIMIT 없는 ORDER BY)가 replica에서 다른 결과. RC 격리 수준 사용 불가</td></tr>
+        <tr><td><b>ROW</b></td><td>변경된 행의 전후 값</td><td>정확, 안전, RC 사용 가능. <b>8.0 기본</b></td><td>대량 UPDATE 시 로그 거대(100만 행 = 100만 이벤트)</td></tr>
+        <tr><td>MIXED</td><td>기본 STATEMENT, 위험하면 ROW</td><td>절충</td><td>판단 기준 복잡</td></tr>
+      </table></div>
+      <p>ROW 포맷은 <b>CDC</b>(Change Data Capture, Debezium 등)의 기반이에요. binlog를 읽어 Kafka로 보내면 DB 변경 이벤트 스트림이 돼요. 분산 시스템 챕터 11장.</p>
+
+      <h3>동기 방식</h3>
+      <ul>
+        <li><b>비동기(기본)</b>: Source는 replica가 받았는지 안 기다려요. 빠르지만 Source가 죽으면 마지막 트랜잭션들이 replica에 없을 수 있음(데이터 유실).</li>
+        <li><b>반동기(semi-sync)</b>: 최소 1대 replica가 <b>릴레이 로그에 받았다</b>(적용은 아님)고 응답해야 커밋 완료. 유실 방지, 지연 약간 증가. 타임아웃되면 비동기로 자동 전환.</li>
+        <li><b>그룹 복제 / InnoDB Cluster</b>: Paxos 기반 합의로 과반수 동의 후 커밋. 자동 장애 조치. 분산 시스템 챕터 9장의 합의가 여기 쓰여요.</li>
+      </ul>
+
+      <h3>토폴로지</h3>
+      <p>단일 source → 다중 replica(표준). 체인(source → replica → replica, 중간 replica는 <code>log_replica_updates</code>). 듀얼 source(양방향, 충돌 위험 커서 비권장). 다중 source → 단일 replica(집계용).</p>
+
+      <h3>복제 지연</h3>
+      <p>Source 커밋 → replica 적용 사이의 시간. <code>SHOW REPLICA STATUS</code>의 <code>Seconds_Behind_Source</code>(부정확할 수 있음, heartbeat 테이블로 측정 권장). 원인: 대량 쓰기(단일 트랜잭션에 100만 행), applier 단일 스레드 병목, replica 하드웨어 열세, replica에서 무거운 읽기 쿼리, 인덱스 없는 UPDATE(ROW 포맷에서 행마다 풀스캔!).</p>
+      <p>애플리케이션 대응:</p>
+      <ul>
+        <li><b>read-your-writes</b>: 쓰기 직후 읽기는 source로. 같은 요청/세션 안에서, 또는 쓴 뒤 N초 동안.</li>
+        <li>중요한 읽기(결제 확인, 재고)는 항상 source.</li>
+        <li>지연 임계값을 넘으면 replica를 읽기 풀에서 자동 제외(ProxySQL, 애플리케이션 헬스체크).</li>
+        <li>대량 쓰기는 쪼개서(11장).</li>
+      </ul>
+
+      <div class="backend"><b>백엔드에서는</b> "글을 썼는데 목록에 없어요"가 복제 지연의 전형적 증상이에요. 트랜잭션 안에서 읽기가 source로 가는지, 커밋 직후 다음 요청의 조회가 replica로 가는지 확인하세요. 그리고 ROW 포맷 + PK 없는 테이블 = replica에서 행 하나 찾으려 풀스캔 = 지연 폭발. 모든 테이블에 PK를 두는 또 하나의 이유예요.</div>
+
+      <div class="summary"><span class="label">핵심 정리</span>
+        <ul><li>ROW 포맷이 표준, CDC의 기반</li><li>비동기는 유실 가능, 반동기는 수신 보장, 그룹 복제는 합의</li><li>복제 지연: read-your-writes는 source로, 대량 쓰기는 분할, PK 필수</li></ul>
+      </div>
+      <div class="check"><span class="label">셀프 체크</span>
+        <ol><li>반동기 복제에서 "받았다"와 "적용했다"의 차이가 왜 중요한가요?</li><li>복제 지연을 줄이기 위해 애플리케이션이 할 수 있는 일 세 가지는?</li></ol>
+        <details class="answer"><summary>답 보기</summary><div class="a">
+          <p><b>1.</b> 반동기는 replica가 릴레이 로그에 기록했다는 확인만 받아요. 아직 적용 전이라 그 replica를 읽어도 최신이 아닐 수 있어요. 유실 방지(내구성)는 보장하지만 읽기 일관성은 보장하지 않아요. 둘을 혼동하면 "반동기인데 왜 옛 데이터가 보이지?"가 돼요.</p>
+          <p><b>2.</b> (1) 대량 UPDATE/DELETE를 작은 배치로 나누기, (2) 모든 테이블에 PK 두기(ROW 적용 효율), (3) replica에서 무거운 분석 쿼리 돌리지 않기(별도 replica로 격리). 추가로 트랜잭션을 짧게.</p>
+        </div></details>
+      </div>
+      <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
+    </section>
+
+    <!-- ================================================================ -->
+    <div class="part-title">실습</div>
+
+    <section id="lab" data-sec>
+      <h2>실습 과제</h2>
+      <p class="lead">로컬에 MySQL 8.0(도커)을 띄우고 직접 해보세요. 샘플 DB는 MySQL 공식 employees DB를 추천해요.</p>
+      <ul class="lab">
+        <li><b>4장</b> <code>SHOW ENGINE INNODB STATUS\G</code>를 읽고 버퍼풀 히트율, 리두 로그 상태, 최근 데드락을 찾아보기</li>
+        <li><b>5장</b> 세션 2개로 REPEATABLE READ에서 non-repeatable read가 안 나는 것, READ COMMITTED에서 나는 것을 재현하기. <code>FOR UPDATE</code> 범위 조건으로 갭 락을 잡고 다른 세션에서 INSERT가 막히는 것 확인하기</li>
+        <li><b>5장</b> 두 세션에서 반대 순서로 UPDATE해 데드락을 만들고 <code>SHOW ENGINE INNODB STATUS</code>의 LATEST DETECTED DEADLOCK 읽기</li>
+        <li><b>5장</b> 인덱스 없는 컬럼으로 UPDATE하면서 다른 세션의 무관한 행 UPDATE가 막히는 것 확인 → 인덱스 추가 후 재확인</li>
+        <li><b>8장</b> 100만 건 테이블에서 <code>LIKE 'abc%'</code> vs <code>LIKE '%abc'</code>, <code>DATE(col) =</code> vs 범위 조건의 EXPLAIN과 실행 시간 비교</li>
+        <li><b>8장</b> 복합 인덱스 (a, b)에서 WHERE a / b / a,b / b,a 조합의 EXPLAIN key_len 비교</li>
+        <li><b>8장</b> AUTO_INCREMENT PK와 UUID v4 PK 테이블에 각각 100만 건 INSERT 시간 비교</li>
+        <li><b>9~10장</b> <code>ORDER BY ... LIMIT 20 OFFSET 500000</code>과 커서 페이징의 EXPLAIN ANALYZE 비교</li>
+        <li><b>10장</b> 회사 서비스의 슬로우 쿼리 상위 3개를 EXPLAIN하고 하나를 튜닝해 전후 비교 기록하기</li>
+        <li><b>16장</b> 도커로 source-replica 구성(GTID), 큰 UPDATE 실행 후 <code>SHOW REPLICA STATUS</code>로 지연 관찰, <code>mysqlbinlog</code>로 ROW 이벤트 읽어보기</li>
+      </ul>
+      <label class="done"><input type="checkbox"> 실습 완료</label>
+    </section>
+
+    <div class="pager">
+      <a href="02-network.html"><small>이전</small>← 2. 네트워크</a>
+      <a class="next" href="04-dsa.html"><small>다음</small>4. 자료구조와 알고리즘 →</a>
+    </div>
+  </main>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

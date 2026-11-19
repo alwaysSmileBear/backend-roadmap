@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>백엔드 기본기 로드맵</title>
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("roadmap:theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body data-chapter="index">
+<div class="index-wrap">
+  <h1>백엔드 기본기 로드맵</h1>
+  <p class="sub">이론 중심 · 6개월~1년 · 각 챕터는 대표 교재의 목차를 따라 구성했어요</p>
+
+  <div class="intro">
+    <h2>읽는 법</h2>
+    <p>챕터마다 대표 교재(OSTEP, 1%의 네트워크 원리, Real MySQL 8.0, DDIA, 오브젝트 등)의 <b>장 구성을 그대로 따라</b> 내용을 정리했어요. 책을 함께 읽으면 가장 좋고, 책이 없어도 이 페이지만으로 각 장의 핵심 개념은 익힐 수 있어요.</p>
+    <p>각 장에는 <b>개념 설명 → 백엔드 연결 → 핵심 정리 → 셀프 체크(답 보기)</b> 순서로 들어 있어요. 셀프 체크에 스스로 답할 수 있으면 "이 장 학습 완료"를 체크하세요. 진행 상황은 이 브라우저에 저장돼요.</p>
+    <p style="margin-bottom:0">시간이 부족할 때의 우선순위:</p>
+    <div class="priority">
+      <span>DB</span><i>›</i><span>OS (병행성·I/O)</span><i>›</i><span>네트워크</span><i>›</i><span>DDIA</span><i>›</i><span>나머지</span>
+    </div>
+    <div class="total-progress">
+      전체 진행률 <b id="totalPct">0%</b> <span id="totalDetail" style="color:var(--muted);font-size:13px"></span>
+      <div class="bar"><span id="totalBar"></span></div>
+      <div class="tools"><button class="theme-btn" type="button">테마: 시스템</button><button id="resetAll">전체 진행 초기화</button></div>
+    </div>
+  </div>
+
+  <div class="cards">
+    <a class="card" data-ch="os" href="01-os.html">
+      <div class="num">CHAPTER 1 · 4~6주</div>
+      <h2>운영체제</h2>
+      <p class="desc">가상화(CPU·메모리), 병행성, 영속성. 스레드풀·커넥션 풀·이벤트 루프·GC가 동작하는 바닥.</p>
+      <p class="ref">기준 교재: <b>OSTEP</b> (Operating Systems: Three Easy Pieces)</p>
+      <div class="pct"></div><div class="bar"><span></span></div>
+    </a>
+    <a class="card" data-ch="network" href="02-network.html">
+      <div class="num">CHAPTER 2 · 3~4주</div>
+      <h2>네트워크</h2>
+      <p class="desc">브라우저에서 서버까지 패킷이 흘러가는 전 과정. TCP·IP·DNS·LB·HTTP.</p>
+      <p class="ref">기준 교재: <b>성공과 실패를 결정하는 1%의 네트워크 원리</b> + HTTP 완벽 가이드</p>
+      <div class="pct"></div><div class="bar"><span></span></div>
+    </a>
+    <a class="card" data-ch="database" href="03-database.html">
+      <div class="num">CHAPTER 3 · 6~8주 · 가장 중요</div>
+      <h2>데이터베이스</h2>
+      <p class="desc">InnoDB 아키텍처, 트랜잭션과 잠금, 인덱스, 옵티마이저, 실행 계획, 복제.</p>
+      <p class="ref">기준 교재: <b>Real MySQL 8.0</b> (1·2권)</p>
+      <div class="pct"></div><div class="bar"><span></span></div>
+    </a>
+    <a class="card" data-ch="dsa" href="04-dsa.html">
+      <div class="num">CHAPTER 4 · 상시 병행</div>
+      <h2>자료구조와 알고리즘</h2>
+      <p class="desc">복잡도, 해시, 트리, 그래프, 정렬·탐색, 그리고 실무에서 쓰는 자료구조.</p>
+      <p class="ref">기준 교재: <b>Hello Coding 알고리즘</b> + Introduction to Algorithms(참고)</p>
+      <div class="pct"></div><div class="bar"><span></span></div>
+    </a>
+    <a class="card" data-ch="distributed" href="05-distributed.html">
+      <div class="num">CHAPTER 5 · 8주 이상</div>
+      <h2>분산 시스템과 설계</h2>
+      <p class="desc">복제, 파티셔닝, 트랜잭션, 합의, 스트림 처리. 그리고 실무 설계 패턴.</p>
+      <p class="ref">기준 교재: <b>데이터 중심 애플리케이션 설계 (DDIA)</b> + 대규모 시스템 설계 기초</p>
+      <div class="pct"></div><div class="bar"><span></span></div>
+    </a>
+    <a class="card" data-ch="design" href="06-design.html">
+      <div class="num">CHAPTER 6 · 상시 병행</div>
+      <h2>소프트웨어 설계</h2>
+      <p class="desc">책임·역할·협력, 의존성 관리, SOLID, 클린 아키텍처, 테스트.</p>
+      <p class="ref">기준 교재: <b>오브젝트</b> + 클린 아키텍처</p>
+      <div class="pct"></div><div class="bar"><span></span></div>
+    </a>
+  </div>
+
+  <div class="intro method">
+    <h2>학습 방법</h2>
+    <ol>
+      <li><b>순서대로 읽기</b> — 각 챕터는 교재 순서라서 앞 장이 뒤 장의 전제예요. 건너뛰지 말고 읽으세요.</li>
+      <li><b>실무와 연결하기</b> — 장마다 "백엔드에서는" 박스가 있어요. 우리 서비스에서 같은 것을 찾아보세요.</li>
+      <li><b>직접 재현하기</b> — 데드락, 실행 계획, 패킷을 직접 만들어 보고 관찰하세요. 읽기만 하면 남지 않아요.</li>
+      <li><b>답 보기 전에 먼저 말해보기</b> — 셀프 체크에 소리 내어 답하거나 글로 쓴 뒤 답을 여세요.</li>
+      <li><b>깊이 우선</b> — 넓게 훑기보다 DB 챕터 하나를 끝까지 파는 편이 효과가 커요.</li>
+    </ol>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>
