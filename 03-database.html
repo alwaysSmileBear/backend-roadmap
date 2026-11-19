@@ -49,7 +49,7 @@
     <!-- ================================================================ -->
     <div class="part-title">0장 관계형 모델링 기초 (교재 외)</div>
 
-    <section id="ch00" data-sec>
+    <section id="ch00" data-sec data-level="junior">
       <h2>0장 정규화와 키 설계</h2>
       <p class="lead">테이블을 어떻게 나누고 무엇을 키로 삼을까</p>
 
@@ -79,6 +79,14 @@
 
       <div class="backend"><b>백엔드에서는</b> JPA 엔티티를 먼저 그리고 테이블을 자동 생성하면 정규화가 안 된 스키마가 나오기 쉬워요. 테이블을 먼저 설계하세요. 그리고 "상태"를 문자열 컬럼으로 두면 오타가 데이터가 돼요. ENUM이나 코드 테이블, 또는 CHECK 제약을 쓰세요.</div>
 
+      <div class="senior"><b>시니어 심화</b> 정규화와 제약은 운영 비용과 맞바꾸는 결정이에요.
+        <ul>
+          <li><b>외래키의 비용</b>: 자식 행을 넣을 때마다 부모 행을 확인하면서 잠금을 잡아서, 부모 행 갱신과 경합하고 데드락의 재료가 돼요. 일부 온라인 스키마 변경 도구는 외래키가 있는 테이블을 지원하지 않거나 제약이 있고, 샤딩하면 샤드 사이에는 외래키를 걸 수 없어요. 그래서 큰 서비스는 외래키 없이 애플리케이션 검증과 정합성 검사 배치로 가기도 해요. 어느 쪽이든 의식적인 선택이어야 해요.</li>
+          <li><b>반정규화한 값은 어긋나요.</b> 갱신 경로를 하나로 모으는 것에 더해, 원본과 복사본을 주기적으로 대조하는 쿼리를 돌려 어긋남을 찾아내야 해요.</li>
+          <li><b>소프트 삭제</b>(<code>deleted_at</code>)는 모든 조회에 조건을 강요하고, 유니크 제약을 깨뜨리고(삭제된 행과 중복), 인덱스를 키워요. 정말 복구가 필요한지, 별도 이력 테이블로 옮기는 편이 낫지 않은지 먼저 따져요.</li>
+        </ul>
+      </div>
+
       <div class="summary"><span class="label">핵심 정리</span>
         <ul><li>정규화 = 사실 하나가 한 곳에, 3NF까지가 실무 기준</li><li>반정규화는 측정 후, 갱신 경로를 한 곳으로</li><li>PK는 작고 순차적인 대리키, 자연키 지양</li></ul>
       </div>
@@ -94,7 +102,7 @@
     <!-- ================================================================ -->
     <div class="part-title">1권 4장 아키텍처</div>
 
-    <section id="ch04-1" data-sec>
+    <section id="ch04-1" data-sec data-level="junior">
       <h2>4.1 MySQL 엔진 아키텍처</h2>
       <p class="lead">MySQL 엔진과 스토리지 엔진의 분리, 쿼리가 실행되는 경로</p>
 
@@ -125,6 +133,14 @@
 
       <div class="backend"><b>백엔드에서는</b> 애플리케이션 서버 N대 × 커넥션 풀 M개 = DB 스레드 N×M. 서버를 늘릴 때 DB 커넥션 수도 같이 늘어난다는 걸 잊으면 <code>Too many connections</code>예요. 서버가 늘어날수록 풀 크기를 줄이거나 ProxySQL 같은 중간 풀을 둬요.</div>
 
+      <div class="senior"><b>시니어 심화</b> 커넥션 수와 실행 중인 쿼리 수는 다른 지표예요. <code>Threads_connected</code>는 연결 수, <code>Threads_running</code>은 지금 실제로 일하는 스레드 수예요. 장애 때 봐야 하는 것은 후자예요. 동시에 실행 중인 쿼리가 코어 수를 크게 넘으면 경합 때문에 전체 처리량이 오히려 떨어져요. <code>max_connections</code>를 올리는 것은 이 문제를 키울 뿐이에요.
+        <ul>
+          <li><b>재연결 폭주</b>: DB가 재시작하거나 장애 조치가 끝난 직후, 모든 애플리케이션이 동시에 풀을 다시 채우려 들어요. 연결 수립(인증, TLS)은 비싸서 이것만으로 DB가 다시 넘어질 수 있어요. 풀 초기화에 지터를 두고 최소 유휴 연결 수를 과하게 잡지 마세요.</li>
+          <li>풀의 최대 연결 수명은 서버의 <code>wait_timeout</code>보다 짧아야 해요. 반대면 서버가 먼저 끊은 연결을 앱이 꺼내 쓰다가 에러가 나요.</li>
+          <li>커넥션을 다중화하는 프록시는 세션 상태(세션 변수, 임시 테이블, 네임드 락)를 쓰는 연결을 공유하지 못하고 고정해 버려요. 이런 기능을 많이 쓰면 프록시의 효과가 사라져요.</li>
+        </ul>
+      </div>
+
       <div class="summary"><span class="label">핵심 정리</span>
         <ul><li>MySQL 엔진(파서·옵티마이저) + 스토리지 엔진(InnoDB)</li><li>커넥션 = 스레드, 세션 메모리는 커넥션 수만큼</li><li>파서 → 전처리 → 옵티마이저 → 실행 → 핸들러</li></ul>
       </div>
@@ -137,7 +153,7 @@
       <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
     </section>
 
-    <section id="ch04-2" data-sec>
+    <section id="ch04-2" data-sec data-level="junior">
       <h2>4.2 InnoDB 스토리지 엔진 아키텍처</h2>
       <p class="lead">버퍼풀, 리두·언두 로그, MVCC — InnoDB가 빠르고 안전한 이유</p>
 
@@ -193,6 +209,13 @@
 
       <div class="backend"><b>백엔드에서는</b> 버퍼풀 히트율(<code>SHOW ENGINE INNODB STATUS</code>의 Buffer pool hit rate)이 99% 아래면 메모리 부족이에요. "DB가 느려졌다"의 첫 확인 항목. 장시간 트랜잭션(배치 작업에서 수십만 건을 한 트랜잭션으로)은 언두를 폭증시키고 다른 쿼리까지 느리게 해요. 배치는 1000건씩 끊어서 커밋하세요. 그리고 <code>innodb_flush_log_at_trx_commit=1</code> + 느린 디스크 = 커밋마다 fsync 대기 = 쓰기 처리량 한계. 클라우드에서는 디스크 IOPS 티어가 곧 TPS 상한이에요.</div>
 
+      <div class="senior"><b>시니어 심화</b> 언두가 쌓이는지는 숫자로 볼 수 있어요. <code>SHOW ENGINE INNODB STATUS</code>의 <b>History list length</b>가 계속 늘면 퍼지가 밀리고 있는 거예요. 원인 트랜잭션은 <code>information_schema.INNODB_TRX</code>에서 <code>trx_started</code>가 오래된 것을 찾으면 돼요. 쓰기를 하지 않는 트랜잭션도 원인이 돼요. 자동 커밋을 끈 세션이 SELECT 한 번 하고 방치되면 그 시점의 스냅샷을 위해 언두가 계속 보존돼요.
+        <ul>
+          <li><b>콜드 스타트</b>: 재시작 직후에는 버퍼풀이 비어 있어 모든 읽기가 디스크로 가요. 종료 시 버퍼풀 목록을 저장하고 시작 시 다시 읽어 들이는 설정(<code>innodb_buffer_pool_dump_at_shutdown</code>, <code>innodb_buffer_pool_load_at_startup</code>)이 켜져 있는지 확인하고, 장애 조치 대상 서버도 미리 데워 둬요.</li>
+          <li><b>플러시가 밀리면 멈춰요.</b> 더티 페이지를 내려쓰는 속도가 변경 속도를 못 따라가면 리두 로그 공간이 바닥나고 쓰기가 일시 정지돼요. <code>innodb_io_capacity</code>가 실제 디스크 성능에 비해 너무 낮게 잡혀 있지 않은지 확인하세요.</li>
+        </ul>
+      </div>
+
       <div class="summary"><span class="label">핵심 정리</span>
         <ul><li>버퍼풀 = 페이지 캐시(LRU old/new), 히트율이 성능</li><li>리두 로그 = WAL, 커밋 = 로그 fsync. 언두 로그 = 롤백 + MVCC</li><li>MVCC = 읽기와 쓰기가 서로 안 막음, 긴 트랜잭션은 언두 폭증</li></ul>
       </div>
@@ -209,7 +232,7 @@
     <!-- ================================================================ -->
     <div class="part-title">1권 5장 트랜잭션과 잠금</div>
 
-    <section id="ch05-1" data-sec>
+    <section id="ch05-1" data-sec data-level="junior">
       <h2>5.1 트랜잭션</h2>
       <p class="lead">ACID와 "트랜잭션을 짧게"의 진짜 의미</p>
 
@@ -234,6 +257,15 @@
 
       <div class="backend"><b>백엔드에서는</b> <code>@Transactional</code> 메서드 안에서 외부 HTTP 호출을 하는 게 가장 흔한 실수예요. 서비스 메서드 전체에 붙이지 말고 DB 작업만 묶은 작은 메서드에 붙이거나, <code>TransactionTemplate</code>으로 범위를 명시하세요. 또 <code>@Transactional(readOnly = true)</code>는 InnoDB에 읽기 전용임을 알려 일부 최적화(트랜잭션 ID 미할당)가 되고, 복제 환경에서 replica로 라우팅하는 기준이 돼요.</div>
 
+      <div class="senior"><b>시니어 심화</b> 스프링에서 트랜잭션은 곧 <b>커넥션 점유</b>예요.
+        <ul>
+          <li>트랜잭션이 시작되면 커넥션을 풀에서 가져와 끝날 때까지 쥐고 있어요. 트랜잭션 안의 느린 작업은 락만 길게 잡는 것이 아니라 풀도 고갈시켜요.</li>
+          <li><code>spring.jpa.open-in-view</code>가 켜져 있으면(기본값) 영속성 컨텍스트가 응답을 다 쓸 때까지 살아 있고, 그동안 커넥션도 반납되지 않을 수 있어요. API 서버에서는 끄고 필요한 데이터를 서비스 계층에서 다 읽어 두세요.</li>
+          <li>기본 롤백 규칙은 런타임 예외에만 적용돼요. 체크 예외를 던지면 커밋돼요. 의도와 다르면 <code>rollbackFor</code>를 명시해요.</li>
+          <li>이벤트 발행, 캐시 삭제, 알림 같은 부수 효과는 <b>커밋 후</b>에 실행해야 해요. 커밋 전에 내보내면 받는 쪽이 아직 보이지 않는 데이터를 조회하거나, 롤백된 변경을 알리게 돼요.</li>
+        </ul>
+      </div>
+
       <div class="summary"><span class="label">핵심 정리</span>
         <ul><li>A = 언두, D = 리두, I = 격리 수준, C = 제약 조건</li><li>트랜잭션 안에는 DB 작업만. 외부 호출·검증은 밖으로</li></ul>
       </div>
@@ -246,7 +278,7 @@
       <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
     </section>
 
-    <section id="ch05-2" data-sec>
+    <section id="ch05-2" data-sec data-level="senior">
       <h2>5.2 MySQL 엔진의 잠금</h2>
       <p class="lead">스토리지 엔진 위에서 걸리는 락들 — 글로벌, 테이블, 네임드, 메타데이터</p>
 
@@ -276,7 +308,7 @@
       <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
     </section>
 
-    <section id="ch05-3" data-sec>
+    <section id="ch05-3" data-sec data-level="junior">
       <h2>5.3 InnoDB 스토리지 엔진 잠금</h2>
       <p class="lead">레코드 락, 갭 락, 넥스트 키 락 — 그리고 "인덱스와 잠금"</p>
 
@@ -327,6 +359,15 @@ KILL &lt;id&gt;;                                          -- 문제 세션 종�
 
       <div class="backend"><b>백엔드에서는</b> <code>SELECT ... FOR UPDATE</code>를 범위 조건으로 쓰면 넥스트 키 락이 걸려 그 범위 INSERT가 전부 막혀요. 가능하면 PK로 특정 행만. 그리고 <code>innodb_lock_wait_timeout</code>(기본 50초!)을 애플리케이션 타임아웃에 맞게 줄이세요. 안 그러면 락 대기 중인 스레드가 50초씩 묶여요. JPA의 <code>@Lock(PESSIMISTIC_WRITE)</code>이 FOR UPDATE, <code>@Version</code>이 낙관적 락이에요. 충돌이 드물면 낙관적 락 + 재시도가 처리량이 높고, 잦으면 비관적 락이 재시도 폭풍을 막아요.</div>
 
+      <div class="senior"><b>시니어 심화</b> 잠금을 피하거나 줄이는 실전 기법이에요.
+        <ul>
+          <li><b>작업 큐에는 <code>SKIP LOCKED</code></b>: <code>SELECT ... FOR UPDATE SKIP LOCKED</code>는 다른 워커가 잠근 행을 건너뛰어요. 여러 워커가 같은 테이블에서 작업을 가져갈 때 서로 막지 않아요. <code>NOWAIT</code>는 기다리지 않고 즉시 실패해요.</li>
+          <li><b>락 대기 타임아웃은 문장만 되돌려요.</b> 기본 설정에서는 타임아웃이 난 그 문장만 롤백되고 트랜잭션은 열린 채로 남아요. 애플리케이션이 명시적으로 롤백하지 않으면 앞서 잡은 락을 그대로 쥐고 있어요.</li>
+          <li><b>갭 락을 줄이려면 READ COMMITTED</b>: 격리 수준을 낮추면 일반 조회·갱신의 갭 락이 대부분 사라져 데드락과 INSERT 대기가 줄어요(외래키·유니크 검사는 예외). 쓰기 경합이 심한 서비스가 RC를 고르는 이유예요.</li>
+          <li><b>동시 INSERT 데드락</b>: 같은 유니크 키를 세 세션이 동시에 넣다가 먼저 넣은 세션이 롤백하면, 기다리던 두 세션이 중복 검사용 공유 락을 나눠 가진 뒤 서로 배타 락을 요구하며 데드락이 나요. "INSERT만 했는데 데드락"의 정체예요. 재시도로 처리해요.</li>
+        </ul>
+      </div>
+
       <div class="summary"><span class="label">핵심 정리</span>
         <ul><li>락은 인덱스 레코드에. 인덱스 없는 UPDATE = 테이블 전체 잠금</li><li>갭 락·넥스트 키 락이 범위 INSERT를 막음</li><li>데드락은 자동 롤백 → 재시도 필수, 순서 고정으로 예방</li></ul>
       </div>
@@ -340,7 +381,7 @@ KILL &lt;id&gt;;                                          -- 문제 세션 종�
       <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
     </section>
 
-    <section id="ch05-4" data-sec>
+    <section id="ch05-4" data-sec data-level="junior">
       <h2>5.4 트랜잭션 격리 수준</h2>
       <p class="lead">READ UNCOMMITTED부터 SERIALIZABLE까지, 그리고 InnoDB의 REPEATABLE READ</p>
 
@@ -369,6 +410,14 @@ KILL &lt;id&gt;;                                          -- 문제 세션 종�
 
       <div class="backend"><b>백엔드에서는</b> "재고 확인 후 차감"에서 SELECT로 10개 확인 → UPDATE 하는 사이 다른 트랜잭션이 차감하면? REPEATABLE READ라도 SELECT는 스냅샷일 뿐 락이 아니라서 막지 못해요. 확인-갱신은 <code>FOR UPDATE</code>로 잠금 읽기하거나 원자적 UPDATE로 해야 해요. 격리 수준은 "읽기의 일관성"이지 "쓰기 경쟁 방지"가 아니에요. 그리고 JPA 영속성 컨텍스트(1차 캐시)는 DB 격리 수준과 별개로 같은 엔티티를 반복 읽기처럼 보이게 해요. 둘을 혼동하지 마세요.</div>
 
+      <div class="senior"><b>시니어 심화</b> REPEATABLE READ에서 헷갈리는 동작 두 가지예요.
+        <ul>
+          <li><b>스냅샷은 BEGIN이 아니라 첫 읽기에서 만들어져요.</b> 트랜잭션을 열어 두고 한참 뒤에 첫 SELECT를 하면 그 시점의 데이터를 봐요. 시작 시점으로 고정하려면 <code>START TRANSACTION WITH CONSISTENT SNAPSHOT</code>을 써요.</li>
+          <li><b>읽기와 쓰기가 보는 세계가 달라요.</b> 일반 SELECT는 스냅샷을 보지만 UPDATE, DELETE, 잠금 읽기는 최신 커밋 데이터를 대상으로 해요. 그래서 SELECT에는 안 보이던 행이 UPDATE에는 걸리고, 그 뒤로는 내가 고친 행이라 SELECT에도 보여요. 같은 트랜잭션 안에서 결과 건수가 달라지는 이유예요.</li>
+        </ul>
+        긴 읽기 전용 작업(리포트, 내보내기)을 RR로 오래 열어 두면 언두가 계속 쌓여요. 이런 작업은 세션 단위로 격리 수준을 낮추거나 복제본에서 돌려요.
+      </div>
+
       <div class="summary"><span class="label">핵심 정리</span>
         <ul><li>RC = 쿼리마다 스냅샷, RR = 트랜잭션당 스냅샷(InnoDB 기본)</li><li>스냅샷 읽기는 락이 아님. 확인-갱신은 FOR UPDATE나 원자적 UPDATE</li><li>InnoDB RR은 넥스트 키 락으로 phantom 대부분 방지</li></ul>
       </div>
@@ -384,7 +433,7 @@ KILL &lt;id&gt;;                                          -- 문제 세션 종�
     <!-- ================================================================ -->
     <div class="part-title">1권 8장 인덱스</div>
 
-    <section id="ch08-1" data-sec>
+    <section id="ch08-1" data-sec data-level="junior">
       <h2>8.1~8.2 디스크 읽기 방식과 인덱스란</h2>
       <p class="lead">랜덤 I/O vs 순차 I/O, 그리고 인덱스가 빠른 이유와 느린 이유</p>
 
@@ -404,6 +453,15 @@ KILL &lt;id&gt;;                                          -- 문제 세션 종�
 
       <div class="backend"><b>백엔드에서는</b> "인덱스를 많이 걸수록 좋다"는 착각이 가장 흔해요. 인덱스 5개면 INSERT마다 B-Tree 5개 + 클러스터링 인덱스를 갱신해요. 쓰기 위주 테이블(로그, 이벤트)은 인덱스를 최소로. 그리고 인덱스마다 버퍼풀 공간을 차지하니, 안 쓰는 인덱스는 메모리 낭비예요. <code>sys.schema_unused_indexes</code>로 찾아 지우세요.</div>
 
+      <div class="senior"><b>시니어 심화</b> 인덱스는 추가보다 삭제와 변경이 조심스러워요.
+        <ul>
+          <li><b>지우기 전에 숨겨 보세요.</b> 8.0의 invisible index는 인덱스를 유지하되 옵티마이저만 못 보게 해요. 숨긴 뒤 문제가 없으면 지우고, 느려지면 즉시 되돌려요. 큰 인덱스를 지웠다가 다시 만드는 데 걸리는 시간을 피할 수 있어요.</li>
+          <li><b>복제본에서도 같은 시간이 걸려요.</b> 원본에서 온라인으로 끝난 인덱스 생성이 복제본에서는 그 시간만큼 복제 지연으로 나타날 수 있어요. 복제본 읽기에 의존하는 서비스라면 작업 시간대를 골라야 해요.</li>
+          <li><b>유니크 인덱스는 쓰기가 더 비싸요.</b> 일반 세컨더리 인덱스의 변경은 모아 뒀다가 나중에 반영할 수 있지만, 유니크 인덱스는 중복 확인을 위해 매번 해당 페이지를 읽어야 해요.</li>
+          <li><b>선택도가 낮은 컬럼</b>(상태, 성별)의 인덱스는 보통 쓸모없지만, 값이 한쪽으로 쏠려 있을 때는 달라요. "미처리 1%"만 찾는 쿼리에는 효과가 커요.</li>
+        </ul>
+      </div>
+
       <div class="summary"><span class="label">핵심 정리</span>
         <ul><li>I/O 비용 = 횟수, 튜닝 = 랜덤 I/O 줄이기</li><li>인덱스 = 정렬된 복사본. 읽기 빠름, 쓰기 느림, 메모리 차지</li></ul>
       </div>
@@ -416,7 +474,7 @@ KILL &lt;id&gt;;                                          -- 문제 세션 종�
       <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
     </section>
 
-    <section id="ch08-3" data-sec>
+    <section id="ch08-3" data-sec data-level="junior">
       <h2>8.3 B-Tree 인덱스</h2>
       <p class="lead">구조, 키 추가·삭제·검색, 그리고 인덱스를 못 쓰는 조건들</p>
 
@@ -483,6 +541,15 @@ KILL &lt;id&gt;;                                          -- 문제 세션 종�
 
       <div class="backend"><b>백엔드에서는</b> 가장 흔한 "인덱스 있는데 안 탐" 원인: (1) <code>LIKE '%검색어%'</code> → 전문 검색이나 검색 엔진으로, (2) <code>DATE(created_at) = '2024-01-01'</code> → <code>created_at >= '2024-01-01' AND created_at < '2024-01-02'</code>로, (3) 문자열 컬럼에 숫자 비교 → 타입 맞추기, (4) 복합 인덱스 순서가 쿼리 패턴과 안 맞음 → 등호 컬럼 먼저. JPA에서는 생성되는 SQL을 로그로 보고 EXPLAIN하세요. 보이지 않는 SQL이 느린 SQL이에요.</div>
 
+      <div class="senior"><b>시니어 심화</b> 인덱스가 있어도 옵티마이저가 고르지 않거나 어느 날 다른 것을 고를 수 있어요.
+        <ul>
+          <li><b>계획 뒤집힘</b>: 실행 계획은 통계에 의존하고 통계는 표본 추정이에요. 데이터 분포가 변하거나 통계가 다시 계산되면 배포 없이도 계획이 바뀌어 갑자기 느려져요. 핵심 쿼리는 실행 계획을 주기적으로 확인하고, 급할 때는 <code>ANALYZE TABLE</code>이나 인덱스 힌트로 고정해요.</li>
+          <li><b>등호 → 정렬 → 범위</b>: 복합 인덱스에 정렬 컬럼이 낄 때는 등호 컬럼 다음에 정렬 컬럼, 마지막에 범위 컬럼을 두면 정렬 작업 없이 인덱스 순서대로 읽을 수 있어요. 범위를 앞에 두면 정렬이 따로 필요해져요.</li>
+          <li><b>긴 문자열의 접두사 인덱스</b>(<code>col(20)</code>)는 크기를 줄여 주지만 커버링과 정렬에는 쓸 수 없어요.</li>
+          <li><b>함수 기반 인덱스</b>(8.0)로 표현식 결과에 인덱스를 걸 수 있어요. 컬럼을 변형하는 조건을 쿼리에서 고칠 수 없을 때의 대안이에요.</li>
+        </ul>
+      </div>
+
       <div class="summary"><span class="label">핵심 정리</span>
         <ul><li>B+Tree: 리프에 키+PK, 리프 연결, 높이 3~4</li><li>왼쪽 접두사 규칙. 컬럼 변형·타입 불일치·<code>%abc</code>는 못 씀</li><li>복합 인덱스: 등호 먼저, 범위 뒤. 범위 뒤 컬럼은 필터만</li></ul>
       </div>
@@ -496,7 +563,7 @@ KILL &lt;id&gt;;                                          -- 문제 세션 종�
       <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
     </section>
 
-    <section id="ch08-8" data-sec>
+    <section id="ch08-8" data-sec data-level="junior">
       <h2>8.8 클러스터링 인덱스</h2>
       <p class="lead">InnoDB 테이블은 PK 순서로 저장된다 — 이것이 모든 것을 바꾼다</p>
 
@@ -536,6 +603,14 @@ KILL &lt;id&gt;;                                          -- 문제 세션 종�
 
       <div class="backend"><b>백엔드에서는</b> UUID를 외부 식별자로 쓰고 싶다면 (1) 내부 PK는 BIGINT AUTO_INCREMENT, UUID는 별도 유니크 컬럼으로, 또는 (2) UUID v7/ULID를 <code>BINARY(16)</code>으로 저장(시간순 + 16바이트). JPA의 <code>@GeneratedValue(strategy = UUID)</code>는 v4라 위험해요. 그리고 "자주 같이 읽는 데이터를 PK 순서로 가깝게 두기"가 설계 포인트예요. 사용자의 주문을 자주 조회한다면 주문 PK를 (user_id, order_id) 복합으로 하면 한 사용자의 주문이 물리적으로 붙어 있어요.</div>
 
+      <div class="senior"><b>시니어 심화</b> PK 설계는 나중에 바꾸기가 가장 어려운 결정이에요.
+        <ul>
+          <li><b>삭제해도 공간은 돌아오지 않아요.</b> 대량 DELETE 뒤에도 테이블 파일 크기는 그대로이고, 빈 공간이 페이지마다 흩어져 남아요. 공간을 되찾으려면 테이블을 다시 만들어야 하는데(<code>ALTER TABLE ... ENGINE=InnoDB</code>), 큰 테이블에서는 I/O 부담과 복제 지연이 커요. 주기적으로 지울 데이터라면 처음부터 파티션으로 설계하는 편이 나아요.</li>
+          <li><b>AUTO_INCREMENT는 연속이 아니에요.</b> 롤백된 INSERT가 쓴 번호는 돌아오지 않고, 벌크 INSERT에서는 번호가 섞여요. "번호가 비면 안 된다"는 요구(전표 번호 등)를 PK에 얹지 마세요. 별도 채번이 필요해요.</li>
+          <li><b>순차 ID를 밖에 노출하면</b> 전체 건수와 증가 속도를 추정할 수 있고, 번호를 하나씩 바꿔 가며 남의 데이터를 조회하는 공격이 쉬워져요. 외부에 내보내는 식별자는 따로 두고 권한 검사는 항상 서버에서 해요.</li>
+        </ul>
+      </div>
+
       <div class="summary"><span class="label">핵심 정리</span>
         <ul><li>InnoDB 테이블 = PK B+Tree, 세컨더리 인덱스 리프 = (키, PK)</li><li>PK는 작고 순차적이고 불변으로. UUID v4 PK는 분할·단편화·크기 문제</li><li>PostgreSQL은 힙 + TID라 다름</li></ul>
       </div>
@@ -551,7 +626,7 @@ KILL &lt;id&gt;;                                          -- 문제 세션 종�
     <!-- ================================================================ -->
     <div class="part-title">1권 9장 옵티마이저와 힌트</div>
 
-    <section id="ch09-1" data-sec>
+    <section id="ch09-1" data-sec data-level="junior">
       <h2>9.1~9.2 쿼리 실행 절차와 기본 데이터 처리</h2>
       <p class="lead">풀 테이블 스캔, ORDER BY(filesort), GROUP BY, DISTINCT, 임시 테이블</p>
 
@@ -586,6 +661,14 @@ KILL &lt;id&gt;;                                          -- 문제 세션 종�
 
       <div class="backend"><b>백엔드에서는</b> 페이징 쿼리 <code>ORDER BY created_at DESC LIMIT 20 OFFSET 100000</code>은 100,020건을 읽고 버려요. 뒤 페이지로 갈수록 느려져요. <b>커서(키셋) 페이징</b>: <code>WHERE created_at < :last AND id < :lastId ORDER BY created_at DESC, id DESC LIMIT 20</code>으로 인덱스 범위 스캔만 하게 하세요. 또 Extra에 <code>Using temporary; Using filesort</code>가 같이 뜨면 거의 항상 튜닝 대상이에요.</div>
 
+      <div class="senior"><b>시니어 심화</b> 정렬과 임시 테이블의 메모리는 세션 단위예요. <code>sort_buffer_size</code>, <code>tmp_table_size</code>를 전역으로 키우면 커넥션 수만큼 곱해져서 메모리가 터져요. 꼭 필요한 쿼리에서만 세션 변수로 올려요. 디스크로 넘어간 임시 테이블 수(<code>Created_tmp_disk_tables</code>)가 늘어나는지가 감시 지표예요.
+        <ul>
+          <li><b>커서 페이징의 함정</b>: 정렬 키가 유일하지 않으면 경계에서 행이 빠지거나 중복돼요. <code>(created_at, id)</code>처럼 유일해지는 조합으로 정렬하고, 조건도 두 컬럼을 함께 비교해요. 그 조건이 인덱스 범위 스캔으로 풀리는지 EXPLAIN으로 확인하세요.</li>
+          <li><b>전체 건수가 더 비싸요.</b> 목록은 20건만 읽지만 "총 N건"은 조건에 맞는 전부를 세야 해요. 큰 목록에서는 건수를 없애거나("더 보기"), 근사치나 별도 집계 값을 써요.</li>
+          <li>옵티마이저가 왜 그 계획을 골랐는지는 <code>optimizer_trace</code>로 볼 수 있어요. 후보 계획별 비용 추정이 나와요.</li>
+        </ul>
+      </div>
+
       <div class="summary"><span class="label">핵심 정리</span>
         <ul><li>옵티마이저 = 통계 기반 비용 추정. 통계 갱신 중요</li><li>정렬·그룹핑은 인덱스 순서로 처리되는 게 최선, 아니면 filesort/임시 테이블</li><li>OFFSET 페이징은 뒤로 갈수록 느림 → 커서 페이징</li></ul>
       </div>
@@ -599,7 +682,7 @@ KILL &lt;id&gt;;                                          -- 문제 세션 종�
       <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
     </section>
 
-    <section id="ch09-3" data-sec>
+    <section id="ch09-3" data-sec data-level="senior">
       <h2>9.3 고급 최적화 — 조인과 서브쿼리</h2>
       <p class="lead">네스티드 루프, 해시 조인, 세미 조인, ICP, MRR</p>
 
@@ -643,7 +726,7 @@ KILL &lt;id&gt;;                                          -- 문제 세션 종�
     <!-- ================================================================ -->
     <div class="part-title">1권 10장 실행 계획</div>
 
-    <section id="ch10" data-sec>
+    <section id="ch10" data-sec data-level="junior">
       <h2>10장 실행 계획 읽기</h2>
       <p class="lead">EXPLAIN의 각 컬럼이 말하는 것</p>
 
@@ -695,6 +778,15 @@ EXPLAIN ANALYZE SELECT ...;      -- 실제 실행하고 실측 시간·행 수 (
 
       <div class="backend"><b>백엔드에서는</b> 슬로우 쿼리 로그(<code>long_query_time=1</code>)를 켜고 <code>pt-query-digest</code>로 집계해 상위 쿼리부터 EXPLAIN하세요. 느린 쿼리 10개 중 8개는 (1) 인덱스 없음/못 씀, (2) filesort+temporary, (3) N+1이에요. 운영 DB에서 EXPLAIN은 안전해요(실행 안 함). EXPLAIN ANALYZE는 실제 실행하니 UPDATE/DELETE엔 트랜잭션 안에서 롤백하거나 replica에서.</div>
 
+      <div class="senior"><b>시니어 심화</b> 슬로우 쿼리 로그는 임계값을 넘는 쿼리만 보여줘요. 0.05초짜리 쿼리가 초당 수천 번 도는 것이 2초짜리 하나보다 DB를 더 많이 써도 로그에는 안 나와요.
+        <ul>
+          <li><code>performance_schema.events_statements_summary_by_digest</code>(또는 <code>sys.statement_analysis</code>)는 쿼리 형태별 <b>총 소요 시간, 실행 횟수, 읽은 행 수 대비 반환 행 수</b>를 줘요. 총 시간 순으로 정렬한 것이 튜닝 우선순위예요.</li>
+          <li>EXPLAIN은 그 서버의 통계로 계획을 세워요. 데이터가 적은 스테이징의 계획은 운영과 달라요. 운영 복제본에서 확인하세요.</li>
+          <li>지금 돌고 있는 느린 쿼리의 계획은 <code>EXPLAIN FOR CONNECTION &lt;id&gt;</code>로 볼 수 있어요.</li>
+          <li>조회 쿼리에는 실행 시간 상한(<code>max_execution_time</code>)을 걸어 두세요. 계획이 뒤집힌 쿼리 하나가 커넥션을 전부 붙잡는 것을 막아요.</li>
+        </ul>
+      </div>
+
       <div class="summary"><span class="label">핵심 정리</span>
         <ul><li>type(ALL/index 주의), key, rows·filtered, Extra가 핵심</li><li>Using index = 커버링(최고), filesort+temporary = 튜닝 대상</li><li>EXPLAIN ANALYZE로 추정과 실측 비교</li></ul>
       </div>
@@ -710,7 +802,7 @@ EXPLAIN ANALYZE SELECT ...;      -- 실제 실행하고 실측 시간·행 수 (
     <!-- ================================================================ -->
     <div class="part-title">1권 11장 쿼리 작성 및 최적화</div>
 
-    <section id="ch11-1" data-sec>
+    <section id="ch11-1" data-sec data-level="junior">
       <h2>11.1~11.4 SELECT 작성 시 주의사항</h2>
       <p class="lead">인덱스를 살리는 WHERE, 날짜·문자열·NULL 비교, 페이징</p>
 
@@ -757,6 +849,15 @@ WHERE salary >= 50000000 / 12</code></pre>
 
       <div class="backend"><b>백엔드에서는</b> QueryDSL/JPQL이 만드는 SQL도 결국 이 규칙을 따라요. 특히 ORM이 생성하는 <code>WHERE DATE(...)</code>, 타입 변환, 불필요한 LEFT JOIN을 로그로 확인하세요. 커서 페이징은 "무한 스크롤"의 표준이고, 관리자 화면의 "N페이지로 이동"은 OFFSET이 필요하지만 그 화면은 트래픽이 적으니 허용해요. 용도에 맞게.</div>
 
+      <div class="senior"><b>시니어 심화</b> 쿼리 하나는 옳아도 규모에서 달라지는 것들이에요.
+        <ul>
+          <li><b><code>COUNT(*)</code>는 InnoDB에서 실제로 세요.</b> MVCC 때문에 트랜잭션마다 보이는 행 수가 달라서 "전체 행 수"를 저장해 두지 않아요. 큰 테이블의 건수는 별도 집계 테이블이나 근사치로 해결해요.</li>
+          <li><b>큰 IN 목록</b>: 값이 수천 개인 IN 절은 계획 수립 비용이 커지고, 값 개수가 일정 수준을 넘으면 옵티마이저가 정밀 추정 대신 통계 추정으로 바꿔서 계획이 불안정해져요. 적당한 크기로 나눠 실행하거나 임시 테이블에 넣고 조인해요.</li>
+          <li><b>OR 조건</b>: 서로 다른 컬럼의 OR는 인덱스 하나로 풀리지 않아요. 인덱스 병합에 기대기보다 UNION ALL로 나누는 편이 계획이 안정적이에요.</li>
+          <li>존재 여부만 필요하면 COUNT가 아니라 <code>LIMIT 1</code>이나 EXISTS로 첫 행에서 멈추게 해요.</li>
+        </ul>
+      </div>
+
       <div class="summary"><span class="label">핵심 정리</span>
         <ul><li>컬럼 변형 금지, 리터럴을 변형. 타입·콜레이션 일치</li><li>NULL은 IS NULL, NOT IN + NULL 주의</li><li>OFFSET → 커서 페이징, SELECT * → 필요한 컬럼</li></ul>
       </div>
@@ -769,7 +870,7 @@ WHERE salary >= 50000000 / 12</code></pre>
       <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
     </section>
 
-    <section id="ch11-2" data-sec>
+    <section id="ch11-2" data-sec data-level="junior">
       <h2>11.5~11.7 INSERT, UPDATE, DELETE, 스키마 조작</h2>
       <p class="lead">쓰기 쿼리의 성능과 안전, 그리고 운영 중 DDL</p>
 
@@ -802,6 +903,15 @@ WHERE salary >= 50000000 / 12</code></pre>
 
       <div class="backend"><b>백엔드에서는</b> JPA <code>saveAll()</code>은 기본적으로 한 건씩 INSERT예요. <code>hibernate.jdbc.batch_size</code> + <code>rewriteBatchedStatements=true</code> + ID 생성 전략이 IDENTITY가 아니어야(IDENTITY는 즉시 INSERT 필요) 배치가 돼요. 마이그레이션 도구(Flyway)로 DDL을 배포하면서 <code>ALGORITHM=INSTANT</code>를 명시하는 습관을 들이세요. "컬럼 추가는 안전, 타입 변경·NOT NULL 추가·인덱스 추가는 크기 확인" 정도의 규칙을 팀에 두세요.</div>
 
+      <div class="senior"><b>시니어 심화</b> 스키마 변경과 대량 변경은 한 번에 하지 않고 나눠요.
+        <ul>
+          <li><b>확장 → 이행 → 축소</b>: 롤링 배포 중에는 옛 코드와 새 코드가 같은 스키마를 써요. 컬럼 이름 변경이나 NOT NULL 추가를 한 번에 하면 둘 중 하나가 깨져요. 새 컬럼 추가(확장) → 양쪽에 쓰기와 기존 데이터 채우기(이행) → 옛 컬럼 제거(축소)를 서로 다른 배포로 나눠요.</li>
+          <li><b>청크는 PK 범위로</b>: <code>DELETE ... LIMIT 1000</code>을 반복하면 매번 앞에서부터 다시 찾느라 갈수록 느려져요. PK 범위를 잘라서 지우고, 청크 사이에 복제 지연을 확인하며 속도를 조절해요.</li>
+          <li><b>INSTANT에도 한도가 있어요.</b> 즉시 추가·삭제한 컬럼 변경이 일정 횟수 쌓이면 다음 변경에서 테이블 재구성이 필요해져요. "컬럼 추가는 항상 즉시"라고 가정하지 말고 큰 테이블은 사전에 알고리즘을 명시해서 확인해요.</li>
+          <li>DDL은 운영과 같은 크기의 데이터로 소요 시간을 재 본 뒤에 실행해요.</li>
+        </ul>
+      </div>
+
       <div class="summary"><span class="label">핵심 정리</span>
         <ul><li>INSERT는 다중 행으로, PK 순으로, upsert는 ON DUPLICATE KEY UPDATE</li><li>대량 UPDATE/DELETE는 LIMIT으로 쪼개서</li><li>DDL은 INSTANT/INPLACE 명시, 긴 트랜잭션 확인, 큰 테이블은 online schema change 도구</li></ul>
       </div>
@@ -817,7 +927,7 @@ WHERE salary >= 50000000 / 12</code></pre>
     <!-- ================================================================ -->
     <div class="part-title">1권 13장 파티션</div>
 
-    <section id="ch13" data-sec>
+    <section id="ch13" data-sec data-level="senior">
       <h2>13장 파티션</h2>
       <p class="lead">하나의 테이블을 여러 물리 조각으로 — 언제 도움이 되고 언제 독인가</p>
 
@@ -859,7 +969,7 @@ WHERE salary >= 50000000 / 12</code></pre>
     <!-- ================================================================ -->
     <div class="part-title">2권 15장 데이터 타입</div>
 
-    <section id="ch15" data-sec>
+    <section id="ch15" data-sec data-level="junior">
       <h2>15장 데이터 타입</h2>
       <p class="lead">문자열, 숫자, 날짜, JSON — 타입 선택이 저장 공간과 인덱스와 버그를 결정한다</p>
 
@@ -892,6 +1002,15 @@ WHERE salary >= 50000000 / 12</code></pre>
 
       <div class="backend"><b>백엔드에서는</b> 타임존 버그는 (1) MySQL 서버 타임존, (2) JDBC 커넥션 타임존, (3) JVM 기본 타임존, (4) 애플리케이션 변환 네 곳이 어긋나서 생겨요. 전부 UTC로 고정하고 <code>SELECT NOW(), @@session.time_zone</code>로 확인하세요. INT ID 고갈은 "어느 날 갑자기 INSERT 실패"로 나타나는 시한폭탄이에요. 지금 확인하세요.</div>
 
+      <div class="senior"><b>시니어 심화</b> 타입은 한 번 정하면 바꾸는 비용이 커요.
+        <ul>
+          <li><b>VARCHAR 길이를 늘릴 때</b>: 길이를 저장하는 바이트 수가 바뀌는 경계(255바이트)를 넘기면 즉시 변경이 안 되고 테이블을 다시 만들어요. utf8mb4에서는 글자 수 63과 64 사이가 그 경계예요.</li>
+          <li><b>콜레이션은 버전마다 기본값이 달라요.</b> 5.7에서 만든 테이블과 8.0에서 만든 테이블은 기본 콜레이션이 달라서, 둘을 조인하면 인덱스를 못 쓰거나 에러가 나요. 후행 공백을 비교에 포함하는지도 콜레이션에 따라 달라요. 업그레이드 때 명시적으로 통일하세요.</li>
+          <li><b>TIMESTAMP와 DATETIME의 차이</b>: TIMESTAMP는 세션 타임존에 따라 변환해서 저장·조회하고 DATETIME은 넣은 값 그대로예요. 섞어 쓰면 타임존 설정이 바뀔 때 한쪽만 값이 달라져 보여요.</li>
+          <li><b>JSON 안의 값으로 조회</b>해야 한다면 생성 컬럼(generated column)으로 꺼내 인덱스를 걸어요. 자주 쓰는 조건이면 처음부터 일반 컬럼으로 두는 것이 맞아요.</li>
+        </ul>
+      </div>
+
       <div class="summary"><span class="label">핵심 정리</span>
         <ul><li>VARCHAR는 필요한 길이만, utf8mb4, 비교 컬럼은 콜레이션 통일</li><li>ID는 BIGINT, 돈은 DECIMAL</li><li>DATETIME + UTC 통일, TIMESTAMP는 2038 한계</li><li>JSON은 부가 속성만, 조건 컬럼은 분리</li></ul>
       </div>
@@ -907,7 +1026,7 @@ WHERE salary >= 50000000 / 12</code></pre>
     <!-- ================================================================ -->
     <div class="part-title">2권 16장 복제</div>
 
-    <section id="ch16-1" data-sec>
+    <section id="ch16-1" data-sec data-level="junior">
       <h2>16.1~16.3 복제 아키텍처와 타입</h2>
       <p class="lead">바이너리 로그, I/O·SQL 스레드, 바이너리 로그 위치 vs GTID</p>
 
@@ -946,6 +1065,15 @@ WHERE salary >= 50000000 / 12</code></pre>
 
       <div class="backend"><b>백엔드에서는</b> RDS/Aurora의 read replica, Aurora의 reader 엔드포인트가 이 구조예요(Aurora는 스토리지 공유라 지연이 훨씬 짧지만 원리는 같아요). 애플리케이션은 쓰기 DataSource와 읽기 DataSource를 나누고, <code>@Transactional(readOnly=true)</code>로 라우팅하는 게 흔한 구현이에요(<code>AbstractRoutingDataSource</code> 또는 JDBC <code>ReplicationDriver</code>).</div>
 
+      <div class="senior"><b>시니어 심화</b> 복제본은 읽기 확장 수단이기 전에 장애 대비 용량이에요.
+        <ul>
+          <li><b>읽기 분산의 연쇄 장애</b>: 복제본 하나가 죽으면 그 읽기가 남은 서버로 몰려요. 평소에 복제본들이 꽉 차게 일하고 있었다면 남은 서버도 연달아 넘어가요. 한 대가 빠져도 버티는 여유를 두고 운영해요.</li>
+          <li><b>승격 대상은 원본과 같은 사양</b>이어야 해요. 비용을 아끼려고 복제본을 작게 두면 장애 조치 직후 쓰기 부하를 못 받아요.</li>
+          <li><b>장애 조치 뒤의 애플리케이션</b>: 풀에 남은 옛 연결, 런타임의 DNS 캐시 때문에 앱이 강등된 서버에 계속 쓰려고 해요. 읽기 전용 에러를 받으면 풀을 비우고 다시 연결하게 만들고, 실제로 장애 조치를 일으켜 보는 훈련으로 확인해요.</li>
+          <li>백업과 무거운 분석 쿼리는 서비스 트래픽을 받지 않는 전용 복제본에서 돌려요.</li>
+        </ul>
+      </div>
+
       <div class="summary"><span class="label">핵심 정리</span>
         <ul><li>binlog → I/O 스레드 → 릴레이 로그 → applier 스레드</li><li>GTID = 전역 트랜잭션 ID, 장애 조치와 토폴로지 변경의 표준</li></ul>
       </div>
@@ -958,7 +1086,7 @@ WHERE salary >= 50000000 / 12</code></pre>
       <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
     </section>
 
-    <section id="ch16-2" data-sec>
+    <section id="ch16-2" data-sec data-level="senior">
       <h2>16.4~16.7 복제 포맷, 동기 방식, 토폴로지, 지연</h2>
       <p class="lead">STATEMENT vs ROW, 비동기 vs 반동기, 그리고 복제 지연을 다루는 법</p>
 
@@ -1009,7 +1137,7 @@ WHERE salary >= 50000000 / 12</code></pre>
     <!-- ================================================================ -->
     <div class="part-title">실습</div>
 
-    <section id="lab" data-sec>
+    <section id="lab" data-sec data-level="junior">
       <h2>실습 과제</h2>
       <p class="lead">로컬에 MySQL 8.0(도커)을 띄우고 직접 해보세요. 샘플 DB는 MySQL 공식 employees DB를 추천해요.</p>
       <ul class="lab">

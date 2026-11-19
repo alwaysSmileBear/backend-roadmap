@@ -48,7 +48,7 @@
     <!-- ================================================================ -->
     <div class="part-title">1부 기초</div>
 
-    <section id="d01" data-sec>
+    <section id="d01" data-sec data-level="junior">
       <h2>1장 시간복잡도와 공간복잡도</h2>
       <p class="lead">"얼마나 빠른가"가 아니라 "입력이 커지면 얼마나 느려지는가"</p>
 
@@ -84,6 +84,15 @@
 
       <div class="backend"><b>백엔드에서는</b> "개발 환경에서는 빠른데 운영에서 느리다"의 대부분은 복잡도 문제예요. 데이터 100건에서는 O(n²)도 1만 번이지만 10만 건에서는 100억 번이에요. 코드 리뷰에서 "이 루프 안에 뭐가 있지?"를 습관적으로 보세요. 그리고 상수도 중요해요. 같은 O(1)이어도 해시 조회(수십 ns)와 Redis 조회(수백 µs)와 DB 조회(수 ms)는 10⁴배 차이예요.</div>
 
+      <div class="senior"><b>시니어 심화</b> Big-O는 메모리 계층을 모르는 모델이에요.
+        <ul>
+          <li><b>캐시 미스가 연산보다 비싸요.</b> 캐시에 있는 데이터와 메모리에서 가져와야 하는 데이터는 접근 시간이 백 배쯤 차이 나요. 그래서 원소가 수십 개 이하일 때는 연속된 배열을 선형 탐색하는 것이 해시나 트리보다 빨라요. 표준 라이브러리의 정렬이 작은 구간에서 삽입 정렬로 바꾸는 이유예요.</li>
+          <li><b>상환 O(1)의 한 번</b>: 평균은 O(1)이어도 리사이징이 걸린 그 한 번은 O(n)이에요. 처리량에는 문제없지만 꼬리 지연에는 그대로 나타나요. 지연에 민감한 경로에서는 크기를 미리 잡아요.</li>
+          <li><b>최악 입력은 공격자가 골라요.</b> 평균 복잡도는 입력이 무작위일 때의 얘기예요. 나쁜 정규식에 긴 문자열, 깊게 중첩된 JSON, 충돌하도록 만든 키는 최악 복잡도를 의도적으로 끌어내요. 외부 입력의 크기와 깊이에 상한을 두는 것이 방어예요.</li>
+          <li>마이크로 벤치마크는 워밍업과 최적화 제거 때문에 잘못 재기 쉬워요. 전용 도구(JMH)를 쓰세요.</li>
+        </ul>
+      </div>
+
       <div class="summary"><span class="label">핵심 정리</span>
         <ul><li>Big-O = 증가율, 상수 무시. 1초 ≈ 10⁸ 연산</li><li>루프 안의 O(n) 연산 = O(n²). 루프 안의 I/O는 더 나쁨</li></ul>
       </div>
@@ -96,7 +105,7 @@
       <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
     </section>
 
-    <section id="d02" data-sec>
+    <section id="d02" data-sec data-level="junior">
       <h2>2장 배열, 연결 리스트, 스택, 큐</h2>
       <p class="lead">가장 기본적인 선형 구조와 그 트레이드오프</p>
 
@@ -126,6 +135,15 @@
 
       <div class="backend"><b>백엔드에서는</b> 스레드풀의 작업 큐가 <code>LinkedBlockingQueue</code>(무제한)인지 <code>ArrayBlockingQueue</code>(유한)인지가 장애 양상을 결정해요. 무제한이면 요청이 쌓여 메모리 OOM, 유한이면 넘칠 때 거부 정책(<code>RejectedExecutionHandler</code>)이 실행돼요. 유한 + 빠른 거부가 보통 더 건강해요(backpressure). Kafka 컨슈머의 폴링, Redis의 <code>LPUSH/BRPOP</code> 큐도 같은 FIFO예요.</div>
 
+      <div class="senior"><b>시니어 심화</b> 자바에서 자주 틀리는 지점이에요.
+        <ul>
+          <li><b><code>ThreadPoolExecutor</code>는 큐가 가득 찬 뒤에야 스레드를 늘려요.</b> 순서가 코어 스레드 → 큐 → 최대 스레드예요. 큐가 무제한이면 최대 스레드 설정은 영영 쓰이지 않고, 코어 수만으로 일하면서 큐만 길어져요.</li>
+          <li><b>박싱이 배열의 이점을 없애요.</b> <code>ArrayList&lt;Integer&gt;</code>는 연속된 정수가 아니라 객체를 가리키는 참조의 배열이에요. 원소마다 객체 헤더가 붙고 접근할 때마다 참조를 따라가요. 큰 숫자 집합은 원시 타입 배열이나 원시 타입 전용 컬렉션을 써요.</li>
+          <li><b>아주 큰 배열</b>은 GC에서 특별 취급을 받아요. G1에서는 리전 크기의 절반을 넘는 객체가 따로 관리되어 단편화와 잦은 GC의 원인이 돼요. 큰 버퍼를 요청마다 새로 만들지 말고 재사용해요.</li>
+          <li>스택과 큐가 필요하면 <code>Stack</code>이나 <code>LinkedList</code> 대신 <code>ArrayDeque</code>를 써요.</li>
+        </ul>
+      </div>
+
       <div class="summary"><span class="label">핵심 정리</span>
         <ul><li>배열이 캐시 친화적이라 대부분 이김. LinkedList는 거의 안 씀</li><li>동적 배열 리사이징은 상환 O(1), 용량 미리 지정</li><li>스택 = DFS/호출, 큐 = BFS/작업, 링 버퍼 = 고정 크기 무할당 큐</li></ul>
       </div>
@@ -141,7 +159,7 @@
     <!-- ================================================================ -->
     <div class="part-title">2부 해시</div>
 
-    <section id="d03" data-sec>
+    <section id="d03" data-sec data-level="junior">
       <h2>3장 해시 테이블</h2>
       <p class="lead">O(1) 조회의 원리, 충돌, 리사이징, 그리고 해시 함수의 품질</p>
 
@@ -169,6 +187,15 @@
 
       <div class="backend"><b>백엔드에서는</b> JPA 엔티티를 <code>HashSet</code>에 넣을 때 <code>equals/hashCode</code>를 PK 기준으로 오버라이드하는데, PK가 저장 전엔 null이라 해시가 바뀌어 Set에서 사라지는 버그가 있어요. 또 <code>HashMap</code>은 스레드 안전하지 않아서 멀티스레드에서 리사이징 중 접근하면 무한 루프(Java 7) 또는 데이터 유실이 나요. 공유하면 <code>ConcurrentHashMap</code>. 그리고 DB의 해시 조인, 해시 인덱스, Redis의 Hash 타입, 세션 저장소 전부 이 구조예요.</div>
 
+      <div class="senior"><b>시니어 심화</b> 해시 맵이 커지면 복잡도가 아닌 다른 문제가 나와요.
+        <ul>
+          <li><b>해시 충돌 공격</b>: 공격자가 같은 버킷으로 가는 키를 대량으로 보내면 조회가 O(1)에서 무너져요. 요청 파라미터나 JSON 키가 그대로 맵에 들어가는 서버가 표적이에요. 그래서 여러 언어가 프로세스마다 다른 무작위 시드로 해시를 계산해요. 방어의 기본은 파라미터 개수와 본문 크기 제한이에요.</li>
+          <li><b>복합 연산은 원자 메서드로</b>: <code>ConcurrentHashMap</code>도 "조회 후 없으면 넣기"를 두 호출로 하면 경쟁 조건이에요. <code>computeIfAbsent</code>, <code>merge</code> 같은 원자 메서드를 써요. 단 그 안에서 같은 맵을 다시 수정하면 안 돼요.</li>
+          <li><b>거대한 맵은 GC 부담</b>이에요. 엔트리 수백만 개는 객체 수백만 개라서 GC가 매번 훑어야 해요. 이 정도 크기의 로컬 캐시는 원시 타입 맵, 힙 밖 저장소, 또는 외부 캐시로 옮기는 것을 검토해요.</li>
+          <li>맵의 키로 넣은 객체의 내용을 바꾸면 해시 값이 달라져 다시 찾을 수 없어요. 키는 불변 객체로 해요.</li>
+        </ul>
+      </div>
+
       <div class="summary"><span class="label">핵심 정리</span>
         <ul><li>해시 함수 → 버킷, 충돌은 체이닝 또는 오픈 어드레싱</li><li>로드 팩터 초과 시 리사이징(O(n)), 초기 용량 지정</li><li>equals ↔ hashCode 계약, 멀티스레드는 ConcurrentHashMap</li></ul>
       </div>
@@ -181,7 +208,7 @@
       <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
     </section>
 
-    <section id="d04" data-sec>
+    <section id="d04" data-sec data-level="senior">
       <h2>4장 분산 해싱 — Consistent Hashing과 Bloom Filter</h2>
       <p class="lead">해시를 여러 서버에 걸쳐 쓰는 법, 그리고 확률적 자료구조</p>
 
@@ -245,7 +272,7 @@
     <!-- ================================================================ -->
     <div class="part-title">3부 트리</div>
 
-    <section id="d05" data-sec>
+    <section id="d05" data-sec data-level="junior">
       <h2>5장 이진 탐색 트리, 균형 트리, 힙</h2>
       <p class="lead">정렬을 유지하면서 O(log n)에 넣고 빼고 찾기</p>
 
@@ -297,6 +324,15 @@
 
       <div class="backend"><b>백엔드에서는</b> "최근 N분 안에 만료되는 것" 같은 타이머는 힙(<code>PriorityQueue</code>, <code>ScheduledThreadPoolExecutor</code> 내부)이고, Netty는 더 싼 타이밍 휠을 써요. 랭킹은 Redis Sorted Set(<code>ZADD/ZRANGE</code>, 스킵 리스트)이 O(log n)이라 DB <code>ORDER BY score</code>보다 훨씬 빨라요. 라우터가 URL 경로를 매칭하는 것도 트라이예요. 정렬된 범위 조회가 필요한 메모리 구조는 <code>TreeMap</code>(<code>subMap</code>, <code>ceilingKey</code>)이에요.</div>
 
+      <div class="senior"><b>시니어 심화</b> 구조를 고를 때 "삭제"와 "메모리"를 같이 봐야 해요.
+        <ul>
+          <li><b>힙은 임의 원소 삭제가 O(n)</b>이에요. 타임아웃처럼 등록한 뒤 대부분 취소되는 작업을 힙 기반 스케줄러에 넣으면, 취소된 항목이 만료 시각까지 그대로 남아 메모리를 차지해요. <code>ScheduledThreadPoolExecutor</code>에서는 <code>setRemoveOnCancelPolicy(true)</code>로 취소 즉시 제거하게 하고, 그런 작업이 아주 많으면 타이밍 휠이 맞아요.</li>
+          <li><b>상위 K개</b>는 전체를 정렬하지 말고 크기 K인 힙 하나로 구해요. O(n log K)이고 메모리는 K만 써요.</li>
+          <li><b>트라이는 메모리를 많이 써요.</b> 노드마다 자식 포인터 묶음을 가지기 때문이에요. 실무 구현은 자식이 하나뿐인 경로를 합친 압축 트라이(radix tree)를 써요.</li>
+          <li>균형 트리는 노드가 흩어져 있어 캐시에 불리해요. 메모리 안에서도 한 노드에 키를 여러 개 담는 B-Tree 계열이 더 빠른 경우가 많아요.</li>
+        </ul>
+      </div>
+
       <div class="summary"><span class="label">핵심 정리</span>
         <ul><li>BST는 치우침 문제 → Red-Black(메모리), B-Tree(디스크)</li><li>힙 = 최소/최대만 O(1), 삽입·삭제 O(log n), 배열 구현</li><li>트라이 = 접두사, 스킵 리스트 = 단순한 정렬 구조(Redis ZSET)</li></ul>
       </div>
@@ -313,7 +349,7 @@
     <!-- ================================================================ -->
     <div class="part-title">4부 그래프</div>
 
-    <section id="d06" data-sec>
+    <section id="d06" data-sec data-level="junior">
       <h2>6장 그래프 — 표현, BFS/DFS, 최단 경로, 위상 정렬</h2>
       <p class="lead">관계를 다루는 구조. 의존성, 네트워크, 추천, 소셜</p>
 
@@ -340,6 +376,15 @@
 
       <div class="backend"><b>백엔드에서는</b> 스프링이 빈 의존성 그래프에서 순환 참조를 탐지하는 것, 마이크로서비스 호출 그래프에서 분산 트레이싱이 경로를 재구성하는 것, 권한 상속(역할 → 역할), 조직도, 카테고리 트리, 추천의 "함께 구매" 그래프, DB의 외래키 의존성 순서로 테이블 삭제하기 전부 그래프 문제예요. 깊은 트리를 재귀 쿼리로 가져오는 건 <code>WITH RECURSIVE</code>(MySQL 8.0)가 BFS를 DB에서 해주는 거예요.</div>
 
+      <div class="senior"><b>시니어 심화</b> 그래프를 DB에 넣는 순간 저장 모델이 성능을 정해요.
+        <ul>
+          <li><b>계층 데이터 저장 방식</b>: 부모 ID만 두는 인접 리스트는 쓰기가 쉽지만 하위 전체 조회에 재귀가 필요해요. 모든 조상-후손 쌍을 저장하는 클로저 테이블은 조회가 조인 한 번이지만 이동과 삽입 때 여러 행을 고쳐요. 경로 문자열을 저장하는 방식은 접두사 조건으로 하위를 찾아요. 읽기와 쓰기 비율로 골라요.</li>
+          <li><b>순환은 데이터 오류로 들어와요.</b> 조직도나 카테고리에 실수로 순환이 생기면 방문 표시 없는 탐색은 끝나지 않아요. 재귀 쿼리에도 깊이 상한을 두고, 저장할 때 순환을 검사해요.</li>
+          <li><b>재귀 DFS는 스택 깊이에 한계</b>가 있어요. 깊이를 보장할 수 없는 데이터에는 명시적 스택을 쓰는 반복문으로 구현해요.</li>
+          <li><b>슈퍼 노드</b>: 연결이 수백만 개인 노드(유명 계정) 하나가 탐색 비용을 지배해요. 이런 노드는 별도 경로로 처리하거나 탐색 폭에 상한을 둬요.</li>
+        </ul>
+      </div>
+
       <div class="summary"><span class="label">핵심 정리</span>
         <ul><li>인접 리스트가 기본. BFS = 큐·최단 거리, DFS = 스택·사이클·경로</li><li>위상 정렬 = DAG의 순서, 사이클이면 불가</li><li>다익스트라 = 힙으로 가중치 최단 경로</li></ul>
       </div>
@@ -355,7 +400,7 @@
     <!-- ================================================================ -->
     <div class="part-title">5부 알고리즘 기법</div>
 
-    <section id="d07" data-sec>
+    <section id="d07" data-sec data-level="junior">
       <h2>7장 정렬과 탐색</h2>
       <p class="lead">비교 정렬의 한계, 안정성, 이진 탐색의 변형들</p>
 
@@ -387,6 +432,15 @@
 
       <div class="backend"><b>백엔드에서는</b> Java <code>Collections.sort</code>(객체)는 팀소트(안정), <code>Arrays.sort(int[])</code>는 듀얼 피벗 퀵소트(불안정). 정렬 키가 같은 항목의 순서가 중요하면 compareTo에 두 번째 키를 넣어 명시하세요. "DB에서 정렬 vs 애플리케이션에서 정렬": DB가 인덱스로 할 수 있으면 DB, 아니면 데이터가 작을 때 애플리케이션. 수십만 건을 가져와 정렬하는 건 네트워크와 메모리 낭비예요.</div>
 
+      <div class="senior"><b>시니어 심화</b> 정렬과 탐색의 버그는 경계와 계약에서 나요.
+        <ul>
+          <li><b>비교 함수의 계약</b>: <code>a - b</code>로 비교하면 정수 오버플로로 부호가 뒤집혀요. 계약(반사성·대칭성·추이성)을 어기면 팀소트가 실행 중에 "Comparison method violates its general contract" 예외를 던지는데, 특정 데이터에서만 나서 재현이 어려워요. <code>Integer.compare</code>나 <code>Comparator.comparing</code>을 쓰세요.</li>
+          <li><b>이진 탐색의 중간값</b>도 <code>(lo + hi) / 2</code>가 오버플로해요. <code>lo + (hi - lo) / 2</code>로 써요.</li>
+          <li><b>분산 환경의 정렬된 페이징</b>: 샤드가 여러 개면 각 샤드에서 offset + limit개씩 가져와 합쳐 정렬해야 해요. 뒤 페이지로 갈수록 샤드 수에 비례해 비용이 커져서, 검색 엔진들이 깊은 페이지에 상한을 두고 커서 방식을 권해요.</li>
+          <li><b>문자열 정렬 순서는 하나가 아니에요.</b> DB의 콜레이션과 애플리케이션의 기본 문자열 비교는 결과가 달라요. 한쪽에서만 정렬하세요.</li>
+        </ul>
+      </div>
+
       <div class="summary"><span class="label">핵심 정리</span>
         <ul><li>비교 정렬 하한 n log n, 실무는 팀소트(안정)·퀵소트</li><li>외부 정렬 = run + K-way 병합 = DB filesort</li><li>이진 탐색은 lower/upper bound와 "답 찾기" 변형이 핵심</li></ul>
       </div>
@@ -399,7 +453,7 @@
       <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
     </section>
 
-    <section id="d08" data-sec>
+    <section id="d08" data-sec data-level="junior">
       <h2>8장 재귀, 분할 정복, 동적 계획법, 그리디</h2>
       <p class="lead">문제를 작게 쪼개는 네 가지 사고방식</p>
 
@@ -425,6 +479,15 @@
 
       <div class="backend"><b>백엔드에서는</b> DP는 직접 쓸 일이 드물지만 "메모이제이션"은 매일 써요. 캐시가 곧 메모이제이션이에요(같은 입력 → 저장된 출력). 비싼 계산 결과를 <code>@Cacheable</code>로 저장하는 것, 재귀적 권한 계산 결과를 요청 범위에서 캐시하는 것. 그리디는 "지금 가장 여유 있는 서버에 보내기"(least connections), "가장 빨리 끝날 작업부터"(SJF 스케줄링) 같은 휴리스틱으로 자주 쓰고, 전역 최적이 아님을 인지하면 돼요. 편집 거리는 검색 오타 교정, LCS는 텍스트 diff·버전 비교에 들어가요.</div>
 
+      <div class="senior"><b>시니어 심화</b> 알고리즘 기법이 운영 문제로 나타나는 지점이에요.
+        <ul>
+          <li><b>백트래킹과 정규식</b>: 많은 정규식 엔진은 백트래킹으로 동작해서, 중첩된 반복이 있는 패턴에 맞지 않는 긴 문자열을 주면 실행 시간이 지수적으로 늘어요. 외부 입력을 정규식으로 검증한다면 입력 길이를 먼저 제한하고, 가능하면 선형 시간을 보장하는 엔진을 써요.</li>
+          <li><b>NP-hard를 알아보는 눈</b>: 배차, 일정 배정, 자원 배치(컨테이너를 노드에 채우기)는 정확한 최적해를 구할 수 없는 부류예요. 최적을 약속하지 말고 "제한 시간 안의 충분히 좋은 해"로 요구사항을 바꾸고, 검증된 휴리스틱이나 솔버를 써요.</li>
+          <li><b>O(n·m) DP에는 입력 상한</b>이 필요해요. 편집 거리나 diff는 양쪽 길이의 곱만큼 시간과 메모리를 써요. 긴 입력 두 개가 들어오면 그 요청 하나가 서버를 붙잡아요.</li>
+          <li>메모이제이션을 캐시로 키우면 문제의 본질이 계산에서 <b>무효화</b>로 바뀌어요. 입력이 같아도 결과가 달라질 수 있는 조건(시간, 권한, 설정)이 키에 다 들어 있는지 확인해요.</li>
+        </ul>
+      </div>
+
       <div class="summary"><span class="label">핵심 정리</span>
         <ul><li>분할 정복 = 독립 부분 문제, DP = 겹치는 부분 문제 + 저장</li><li>DP 핵심 = 상태 정의. 캐시 = 메모이제이션</li><li>그리디 = 빠르지만 최적 보장은 증명 필요, 반례부터</li></ul>
       </div>
@@ -441,7 +504,7 @@
     <!-- ================================================================ -->
     <div class="part-title">6부 실무 자료구조</div>
 
-    <section id="d09" data-sec>
+    <section id="d09" data-sec data-level="junior">
       <h2>9장 캐시 교체와 레이트 리미터</h2>
       <p class="lead">LRU/LFU 구현, 토큰 버킷, 슬라이딩 윈도우 — 직접 구현해 볼 가치가 있는 것들</p>
 
@@ -492,6 +555,16 @@
 
       <div class="backend"><b>백엔드에서는</b> 로컬 캐시는 Caffeine(기본 선택), 분산 캐시는 Redis. 레이트 리밋은 게이트웨이(Nginx, Spring Cloud Gateway, Envoy)에서 토큰 버킷으로, 사용자별이면 Redis + Lua. 직접 구현할 일이 있다면 LRU와 토큰 버킷은 각각 30줄 안에 나오니 한 번은 손으로 짜 보세요. 면접 단골이기도 해요.</div>
 
+      <div class="senior"><b>시니어 심화</b> 단일 프로세스에서는 30줄이지만 분산 환경에서는 설계 문제예요.
+        <ul>
+          <li><b>분산 레이트 리미터의 선택지</b>: 중앙 저장소(Redis)에서 매 요청마다 세면 정확하지만 요청마다 왕복이 생기고 저장소가 장애점이 돼요. 인스턴스가 토큰을 묶음으로 받아 와 로컬에서 쓰면 왕복은 줄지만 근사치가 돼요. 인스턴스별로 "전체 한도 / N"을 주는 방식은 트래픽이 고르지 않으면 틀려요.</li>
+          <li><b>저장소가 죽었을 때</b> 전부 통과시킬지 전부 막을지를 미리 정해야 해요. 남용 방지 목적이면 통과, 하위 시스템 보호 목적이면 차단이 보통이에요.</li>
+          <li><b>시계</b>: 서버마다 시각이 달라서 각자 시계로 윈도우를 계산하면 경계가 어긋나요. 저장소의 시각을 기준으로 하고, 조회와 갱신을 한 번의 원자 연산(Lua 스크립트)으로 묶어요.</li>
+          <li><b>순수 LRU는 전체 순회에 약해요.</b> 배치가 데이터를 한 번 훑으면 자주 쓰던 항목이 전부 밀려나요. 그래서 실제 구현은 새 항목을 바로 최상단에 올리지 않거나 접근 빈도를 함께 봐요.</li>
+          <li>거절할 때는 <code>429</code>와 함께 <code>Retry-After</code>를 줘서 클라이언트가 언제 다시 시도할지 알게 해요.</li>
+        </ul>
+      </div>
+
       <div class="summary"><span class="label">핵심 정리</span>
         <ul><li>LRU = HashMap + 이중 연결 리스트, O(1). 실무는 근사 LRU/TinyLFU</li><li>토큰 버킷 = burst 허용 + 평균 제한, O(1) 저장. 슬라이딩 윈도우 카운터 = 경계 문제 완화</li></ul>
       </div>
@@ -505,7 +578,7 @@
       <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
     </section>
 
-    <section id="d10" data-sec>
+    <section id="d10" data-sec data-level="senior">
       <h2>10장 백엔드 시스템 속의 자료구조 지도</h2>
       <p class="lead">지금까지 배운 것이 실제 어디에 있는지 한눈에</p>
 
@@ -559,7 +632,7 @@
     <!-- ================================================================ -->
     <div class="part-title">실습</div>
 
-    <section id="lab" data-sec>
+    <section id="lab" data-sec data-level="junior">
       <h2>실습 과제</h2>
       <p class="lead">직접 구현해 보는 것이 가장 빨라요. 각각 100줄 이내예요.</p>
       <ul class="lab">

@@ -11,6 +11,8 @@
   --answer-bg: #f3f8f4;
   --warn-bg: #fff7e6;
   --warn: #b8740f;
+  --senior: #7048c4;
+  --senior-soft: #f1ecfb;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -26,6 +28,8 @@
     --answer-bg: #1b2a21;
     --warn-bg: #3a2e14;
     --warn: #f0c060;
+    --senior: #b59bf0;
+    --senior-soft: #262038;
   }
 }
 :root[data-theme="dark"] {
@@ -41,6 +45,8 @@
   --answer-bg: #1b2a21;
   --warn-bg: #3a2e14;
   --warn: #f0c060;
+  --senior: #b59bf0;
+  --senior-soft: #262038;
 }
 .theme-btn { font-weight: 600; }
 
@@ -251,6 +257,34 @@ label.done {
 }
 label.done input { width: 17px; height: 17px; accent-color: var(--done); }
 section.done label.done { color: var(--done); }
+
+/* ---------- junior / senior levels ---------- */
+.level-btn { font-weight: 600; }
+:root[data-view="senior"] .tools .level-btn { color: var(--senior); border-color: var(--senior); }
+.senior {
+  margin: 14px 0; padding: 10px 14px;
+  border-left: 3px solid var(--senior); background: var(--senior-soft);
+  border-radius: 0 8px 8px 0; font-size: 14px;
+}
+.senior > b:first-child { color: var(--senior); }
+.senior ul { margin: 4px 0 0; }
+section[data-level="senior"] > h2::after, #toc .lv {
+  content: "시니어"; display: inline-block; flex-shrink: 0;
+  font-size: 11px; font-weight: 600; line-height: 1.6;
+  padding: 0 7px; border-radius: 4px; margin-left: 8px; vertical-align: 3px;
+  background: var(--senior-soft); color: var(--senior);
+}
+#toc .lv { margin-left: auto; vertical-align: 0; }
+.lv-chip {
+  font-size: 12px; font-weight: 600; padding: 1px 7px; border-radius: 4px;
+  background: var(--senior-soft); color: var(--senior); white-space: nowrap;
+}
+#toc li a .name { min-width: 0; }
+/* junior view (also the state before app.js runs): hide senior-only content */
+:root:not([data-view="senior"]) section[data-level="senior"],
+:root:not([data-view="senior"]) #toc li[data-level="senior"],
+:root:not([data-view="senior"]) .senior { display: none; }
+[hidden] { display: none !important; }
 
 /* prev/next */
 .pager {
