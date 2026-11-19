@@ -1,6 +1,6 @@
 (function () {
   var PREFIX = 'roadmap:';
-  var CHAPTERS = ['os', 'network', 'database', 'dsa', 'distributed', 'design'];
+  var CHAPTERS = ['os', 'network', 'database', 'dsa', 'distributed', 'design'/* ext-keys:start */, 'security', 'jvm', 'performance'/* ext-keys:end */];
 
   // Section counts per chapter, so the index page can show totals without the
   // chapter pages having been opened first. `senior` lists the ids of
@@ -13,7 +13,12 @@
     database: { total: 20, senior: ['ch05-2', 'ch09-3', 'ch13', 'ch16-2'] },
     dsa: { total: 11, senior: ['d04', 'd10'] },
     distributed: { total: 16, senior: ['c03', 'c06', 'c08', 'c09', 'c10', 'c12'] },
-    design: { total: 13, senior: ['o12', 'o14', 'ca02', 'ca03'] }
+    design: { total: 13, senior: ['o12', 'o14', 'ca02', 'ca03'] },
+    /* ext-meta:start */
+    security: { total: 10, senior: ['sec08', 'sec09'] },
+    jvm: { total: 10, senior: ['jvm02', 'jvm05'] },
+    performance: { total: 10, senior: ['pf07', 'pf08'] }
+    /* ext-meta:end */
   };
 
   function load(key) {

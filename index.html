@@ -16,6 +16,7 @@
     <h2>읽는 법</h2>
     <p>챕터마다 대표 교재(OSTEP, 1%의 네트워크 원리, Real MySQL 8.0, DDIA, 오브젝트 등)의 <b>장 구성을 그대로 따라</b> 내용을 정리했어요. 책을 함께 읽으면 가장 좋고, 책이 없어도 이 페이지만으로 각 장의 핵심 개념은 익힐 수 있어요.</p>
     <p>각 장에는 <b>개념 설명 → 백엔드 연결 → 핵심 정리 → 셀프 체크(답 보기)</b> 순서로 들어 있어요. 셀프 체크에 스스로 답할 수 있으면 "이 장 학습 완료"를 체크하세요. 진행 상황은 이 브라우저에 저장돼요.</p>
+    <p><b>챕터 1~6이 기본기</b>이고, 챕터 7부터는 그 위에 쌓는 <b>확장 챕터</b>예요. 확장 챕터는 기본기를 전제로 하니 챕터 1~6을 먼저 읽으세요. 확장 챕터끼리는 순서 없이 필요한 것부터 읽어도 돼요.</p>
     <p><b>레벨</b>은 두 가지예요. <b>주니어</b>는 1~3년차가 반드시 알아야 하는 핵심 장만 보여줘요. <b>시니어</b>는 전체 장에 더해, 각 장의 <span class="lv-chip">시니어 심화</span> 박스(운영 중 장애 양상, 트레이드오프, 진단 방법)까지 보여줘요. 아래 "레벨" 버튼이나 각 챕터의 사이드바에서 바꿀 수 있고, 진행률은 선택한 레벨 기준으로 계산돼요.</p>
     <p style="margin-bottom:0">시간이 부족할 때의 우선순위:</p>
     <div class="priority">
@@ -72,6 +73,33 @@
       <div class="pct"></div><div class="bar"><span></span></div>
     </a>
   </div>
+
+  <!-- ext-cards:start -->
+  <div class="part-title">확장 1 — 실무에서 바로 필요한 것</div>
+  <div class="cards">
+    <a class="card" data-ch="security" href="07-security.html">
+      <div class="num">CHAPTER 7 · 3~4주</div>
+      <h2>보안</h2>
+      <p class="desc">위협 모델링, 암호화 기초, 인증과 인가, 인젝션·XSS·CSRF·SSRF, 비밀 관리.</p>
+      <p class="ref">기준 자료: <b>OWASP Top 10 · ASVS</b></p>
+      <div class="pct"></div><div class="bar"><span></span></div>
+    </a>
+    <a class="card" data-ch="jvm" href="08-jvm.html">
+      <div class="num">CHAPTER 8 · 4~6주</div>
+      <h2>JVM과 자바 동시성</h2>
+      <p class="desc">클래스 로딩, JIT, 메모리와 GC, 자바 메모리 모델, 동시성 도구, 진단.</p>
+      <p class="ref">기준 교재: <b>자바 병렬 프로그래밍</b> + 자바 최적화</p>
+      <div class="pct"></div><div class="bar"><span></span></div>
+    </a>
+    <a class="card" data-ch="performance" href="09-performance.html">
+      <div class="num">CHAPTER 9 · 3~4주</div>
+      <h2>성능 분석</h2>
+      <p class="desc">USE·RED 방법론, 지연 분포, 프로파일링, 부하 테스트, 큐잉 이론과 용량 계획.</p>
+      <p class="ref">기준 교재: <b>시스템 성능 분석</b> (Systems Performance)</p>
+      <div class="pct"></div><div class="bar"><span></span></div>
+    </a>
+  </div>
+  <!-- ext-cards:end -->
 
   <div class="intro method">
     <h2>학습 방법</h2>
