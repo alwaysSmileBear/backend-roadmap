@@ -37,8 +37,8 @@
     <header class="chap-head">
       <h1>PostgreSQL</h1>
       <p class="meta">기준 자료: PostgreSQL 공식 문서 + The Internals of PostgreSQL · 2~3주</p>
-      <p>데이터베이스 챕터는 MySQL(InnoDB)을 기준으로 했어요. 이 챕터는 같은 문제를 <b>PostgreSQL이 어떻게 다르게 풀었는지</b>를 봐요. 두 구현을 비교하면 "DB가 원래 그런 것"과 "이 제품이 그렇게 선택한 것"이 구분돼요.</p>
-      <p>데이터베이스 챕터의 InnoDB 아키텍처와 트랜잭션 장을 먼저 읽고 오세요. PostgreSQL을 운영에서 쓴다면 <b>2장(MVCC)과 3장(VACUUM)</b>이 가장 중요해요. PostgreSQL 장애의 큰 부분이 여기서 나와요.</p>
+      <p>데이터베이스 챕터는 MySQL(InnoDB)을 기준으로 했어요. 이 챕터는 같은 문제를 <b>PostgreSQL이 어떻게 다르게 풀었는지</b>를 봐요. 두 구현을 나란히 보면 "DB가 원래 그런 것"과 "이 제품이 그렇게 고른 것"이 구분돼요.</p>
+      <p>예시는 쇼핑몰이 새로 만드는 <b>정산 서비스</b>예요. 이 서비스는 PostgreSQL을 쓰기로 했고, MySQL에 익숙한 팀이 운영하면서 부딪히는 차이를 따라가요. 데이터베이스 챕터의 InnoDB 구조와 트랜잭션 장을 먼저 읽으세요. 운영한다면 2장(MVCC)과 3장(VACUUM)이 가장 중요해요. PostgreSQL 장애의 큰 부분이 여기서 나와요.</p>
       <div class="books">
         <div class="book"><b>PostgreSQL 공식 문서 <span class="tag must">기준 자료</span></b><span>postgresql.org/docs · 동시성 제어, 정기 유지 관리 장부터</span></div>
         <div class="book"><b>The Internals of PostgreSQL <span class="tag deep">심화</span></b><span>interdb.jp/pg · 내부 구조를 그림으로</span></div>
@@ -52,46 +52,39 @@
       <h2>1장 프로세스 구조와 메모리</h2>
       <p class="lead">연결 하나가 프로세스 하나다</p>
 
-      <h3>프로세스 모델</h3>
-      <p>MySQL은 연결마다 <b>스레드</b>를 쓰고, PostgreSQL은 연결마다 <b>프로세스</b>를 하나씩 만들어요(백엔드 프로세스). 프로세스는 스레드보다 만드는 비용과 메모리가 커요.</p>
-      <ul>
-        <li>연결 수백 개까지는 괜찮지만 수천 개가 되면 메모리와 문맥 전환 부담이 커져요.</li>
-        <li>그래서 PostgreSQL에서는 <b>커넥션 풀러</b>(PgBouncer 등)를 앞에 두는 것이 사실상 표준이에요.</li>
-      </ul>
-      <h3>주요 프로세스</h3>
-      <ul>
-        <li><b>postmaster</b>: 연결을 받아 백엔드 프로세스를 만드는 부모.</li>
-        <li><b>백엔드</b>: 클라이언트 하나의 쿼리를 처리.</li>
-        <li><b>WAL writer, checkpointer, background writer</b>: 로그와 더티 페이지를 디스크에 씀.</li>
-        <li><b>autovacuum</b>: 죽은 튜플을 정리(3장).</li>
-      </ul>
-      <h3>메모리</h3>
-      <div class="tbl"><table>
-        <tr><th>설정</th><th>범위</th><th>용도</th></tr>
-        <tr><td><code>shared_buffers</code></td><td>전체 공유</td><td>데이터 페이지 캐시</td></tr>
-        <tr><td><code>work_mem</code></td><td><b>연산마다</b></td><td>정렬, 해시 조인 한 번에 쓸 수 있는 메모리</td></tr>
-        <tr><td><code>maintenance_work_mem</code></td><td>작업마다</td><td>VACUUM, 인덱스 생성</td></tr>
-      </table></div>
-      <h3>이중 캐시</h3>
-      <p>InnoDB는 보통 OS 캐시를 우회하고 버퍼풀을 크게 잡아요. PostgreSQL은 <b>OS 페이지 캐시에도 의존</b>해요. 그래서 <code>shared_buffers</code>를 메모리의 대부분으로 잡지 않고 일부(흔히 4분의 1 정도에서 시작)만 주고 나머지를 OS에 남겨요.</p>
-      <h3>저장 구조: 힙 테이블</h3>
-      <p>InnoDB는 테이블 자체가 PK 순서로 정렬된 B-Tree예요(클러스터링 인덱스). PostgreSQL의 테이블은 <b>정렬되지 않은 힙</b>이에요. 행은 빈 곳에 들어가고, 모든 인덱스는 행의 물리 위치(TID)를 가리켜요. PK 인덱스도 다른 인덱스와 똑같은 보조 인덱스예요.</p>
+      <h3>문제: 연결 수를 늘렸더니 DB가 느려졌다</h3>
+      <p>정산 서비스 서버를 10대에서 20대로 늘렸어요. 서버마다 커넥션 풀이 50개라 DB 연결은 1,000개가 됐어요. MySQL 때는 이 정도는 괜찮았는데, PostgreSQL은 연결이 늘자 메모리 사용량이 크게 오르고 쿼리가 전반적으로 느려졌어요. 대부분의 연결은 놀고 있었는데요.</p>
 
-      <div class="backend"><b>백엔드에서는</b> <code>work_mem</code>은 쿼리 하나가 아니라 <b>쿼리 안의 정렬·해시 연산 하나마다</b> 적용돼요. 복잡한 쿼리는 여러 번 쓰고, 그게 연결 수만큼 곱해져요. 전역으로 크게 올리면 메모리가 터져요. 필요한 쿼리에서만 세션 단위로 올리세요. 그리고 풀러를 트랜잭션 단위 모드로 쓰면 세션에 묶인 기능(세션 변수, 일부 방식의 준비된 문장, 세션 수준 잠금)이 동작하지 않을 수 있어요.</div>
+      <h3>스레드가 아니라 프로세스</h3>
+      <p>MySQL은 연결마다 <b>스레드</b>를 하나씩 써요. PostgreSQL은 연결마다 운영체제 <b>프로세스</b>를 하나씩 만들어요(백엔드 프로세스). 프로세스는 스레드보다 만드는 비용이 크고, 각자 메모리를 따로 차지해요. 연결이 수백 개까지는 괜찮지만 천 개를 넘으면 메모리와 문맥 전환 부담이 커지고, 쿼리마다 "지금 진행 중인 트랜잭션 목록"을 확인하는 비용도 연결 수에 따라 커져요. 놀고 있는 연결도 비용이에요.</p>
+      <figure class="diagram">
+              <svg width="534" viewBox="0 0 534 92" role="img" aria-label="연결마다 프로세스가 생기므로, 많은 클라이언트 연결을 풀러가 받아 적은 DB 연결로 나눠 쓴다"><rect x="12" y="26" width="117" height="52" rx="8" class="dg-box"/><text x="70.5" y="49" text-anchor="middle" class="dg-tb">정산 서버 20대</text><text x="70.5" y="65" text-anchor="middle" class="dg-tm">풀 50개씩</text><path d="M131 52 L216 52" class="dg-l"/><text x="174" y="44" text-anchor="middle" class="dg-tm">연결 1,000개</text><rect x="219" y="26" width="95" height="52" rx="8" class="dg-acc"/><text x="266.5" y="49" text-anchor="middle" class="dg-tb">PgBouncer</text><text x="266.5" y="65" text-anchor="middle" class="dg-tm">커넥션 풀러</text><path d="M316 52 L381 52" class="dg-lg"/><text x="349" y="44" text-anchor="middle" class="dg-tg">연결 50개</text><rect x="384" y="26" width="138" height="52" rx="8" class="dg-soft"/><text x="453" y="49" text-anchor="middle" class="dg-tb">PostgreSQL</text><text x="453" y="65" text-anchor="middle" class="dg-tm">백엔드 프로세스 50개</text></svg>
+              <figcaption>연결마다 프로세스가 생기므로, 많은 클라이언트 연결을 풀러가 받아 적은 DB 연결로 나눠 쓴다</figcaption>
+            </figure>
+      <p>그래서 PostgreSQL에서는 <b>커넥션 풀러</b>(PgBouncer 같은)를 DB 앞에 두는 것이 사실상 표준이에요. 애플리케이션 서버들의 연결 1,000개를 풀러가 받고, 실제 DB에는 50개 정도의 연결만 열어서 나눠 써요. 대부분의 연결은 대부분의 시간 동안 쉬고 있으니 이렇게 해도 충분해요.</p>
 
-      <div class="senior"><b>시니어 심화</b> <ul>
-          <li><b>힙 구조의 장단점</b>: PK를 무작위 값으로 써도 테이블 자체는 영향을 덜 받아요(인덱스는 여전히 받아요). 반면 PK 범위 조회가 물리적으로 흩어진 행을 읽어야 해서 InnoDB보다 불리할 수 있어요. 보조 인덱스 조회는 PK를 한 번 더 거치지 않고 바로 행으로 가요.</li>
-          <li><b>연결 폭주</b>가 PostgreSQL에서는 더 치명적이에요. 프로세스 생성 비용에 더해, 활성 연결이 많을수록 스냅샷을 만드는 비용도 커져요. 애플리케이션 인스턴스 수 × 풀 크기가 DB의 한도 안에 드는지 계산하고, 풀러에서 총량을 제한해요.</li>
-          <li><code>idle in transaction</code> 상태로 방치된 연결은 잠금을 쥐고 VACUUM을 막아요. 시간 제한(<code>idle_in_transaction_session_timeout</code>)을 걸어 두세요.</li>
-        </ul></div>
+      <h3>그 밖의 프로세스</h3>
+      <p>연결을 받아 백엔드 프로세스를 만드는 부모 프로세스(postmaster)가 있고, WAL을 디스크에 쓰는 프로세스, 더티 페이지를 내려쓰는 체크포인트·백그라운드 쓰기 프로세스, 그리고 죽은 튜플을 정리하는 <b>autovacuum</b>(3장)이 있어요.</p>
+
+      <h3>메모리: 이중 캐시와 연산별 메모리</h3>
+      <p>데이터 페이지 캐시인 <code>shared_buffers</code>는 MySQL의 버퍼풀과 같은 역할이에요. 다른 점은 PostgreSQL이 <b>운영체제의 파일 캐시에도 기댄다</b>는 거예요. InnoDB는 보통 운영체제 캐시를 건너뛰고 버퍼풀을 메모리의 대부분으로 잡지만, PostgreSQL은 <code>shared_buffers</code>를 메모리의 일부(흔히 4분의 1 정도에서 시작)만 주고 나머지를 운영체제에 남겨요.</p>
+      <p><code>work_mem</code>은 정렬이나 해시 조인 <b>한 번</b>에 쓸 수 있는 메모리예요. 쿼리 하나가 아니라 쿼리 안의 정렬·해시 연산마다 적용되고, 그것이 연결 수만큼 곱해져요. 정산 집계 쿼리가 느리다고 전역으로 크게 올리면 연결이 많을 때 메모리가 터져요.</p>
+
+      <h3>테이블은 힙이다</h3>
+      <p>InnoDB의 테이블은 기본 키 순서로 정렬된 B-Tree 자체예요(클러스터링 인덱스). PostgreSQL의 테이블은 <b>정렬되지 않은 힙</b>이에요. 행은 빈자리에 들어가고, 모든 인덱스는 행의 물리적 위치(TID)를 가리켜요. 기본 키 인덱스도 다른 인덱스와 똑같은 보조 인덱스예요.</p>
+
+      <div class="backend"><b>백엔드에서는</b> <code>work_mem</code>은 필요한 쿼리에서만 세션 단위로 올리세요(<code>SET LOCAL work_mem = ...</code>). 그리고 풀러를 트랜잭션 단위로 연결을 나눠 쓰는 모드로 쓰면, 세션에 붙어 있는 기능(세션 변수, 일부 방식의 준비된 문장, 세션 수준 잠금)이 예상대로 동작하지 않을 수 있어요. 트랜잭션이 끝나면 다음 트랜잭션은 다른 DB 연결에서 실행될 수 있기 때문이에요. 쓰는 드라이버와 기능이 그 모드와 맞는지 먼저 확인하세요.</div>
+
+      <div class="senior"><b>시니어 심화</b> 연결 관리에서 PostgreSQL이 특히 민감한 상태가 <code>idle in transaction</code>이에요. 트랜잭션을 시작하고 쿼리를 실행한 뒤 커밋도 롤백도 하지 않은 채 쉬고 있는 연결이에요. 애플리케이션에서 트랜잭션 안에 외부 API 호출을 넣었거나, 예외가 났는데 트랜잭션을 닫지 않은 경우에 생겨요.
+        <p>이 연결은 두 가지를 붙잡아요. 잡아 둔 <b>잠금</b>을 계속 쥐고 있어서 다른 쿼리를 막고, 그 트랜잭션의 스냅샷 때문에 <b>VACUUM이 그 시점 이후의 죽은 튜플을 치우지 못해요</b>(3장). 몇 시간 방치되면 테이블이 눈에 띄게 부풀어요. <code>idle_in_transaction_session_timeout</code>으로 일정 시간 넘게 쉬는 트랜잭션을 강제로 끊고, <code>pg_stat_activity</code>에서 이 상태의 연결을 모니터링하세요. 또 힙 구조 덕분에 기본 키를 무작위 값으로 써도 테이블 자체는 InnoDB만큼 흩어지지 않지만, 인덱스는 여전히 영향을 받고, 기본 키 범위 조회는 물리적으로 흩어진 행을 읽어야 해서 InnoDB보다 불리할 수 있어요.</p></div>
 
       <div class="summary"><span class="label">핵심 정리</span>
-        <ul><li>연결 = 프로세스. 커넥션 풀러가 사실상 필수</li><li>shared_buffers + OS 캐시의 이중 캐시. work_mem은 연산마다</li><li>테이블은 힙, 모든 인덱스가 물리 위치를 가리킴</li></ul>
+        <ul><li>연결 = 프로세스. 놀고 있는 연결도 비용 → 커넥션 풀러가 사실상 필수</li><li>shared_buffers + 운영체제 캐시의 이중 캐시. work_mem은 연산마다 × 연결 수</li><li>테이블은 힙, 모든 인덱스가 물리 위치를 가리킴</li></ul>
       </div>
       <div class="check"><span class="label">셀프 체크</span>
         <ol><li>PostgreSQL에서 커넥션 풀러를 DB 앞에 따로 두는 것이 MySQL보다 더 강조되는 이유는 무엇인가요?</li></ol>
         <details class="answer"><summary>답 보기</summary><div class="a">
-          <p>PostgreSQL은 연결마다 운영체제 프로세스를 하나씩 만들어요. 프로세스는 스레드보다 생성 비용이 크고 메모리를 더 쓰며, 수가 많아지면 문맥 전환과 내부 자료구조 경합이 커져요. 애플리케이션 서버가 여러 대이고 각자 풀을 가지면 DB 쪽 연결 수는 그 곱이 되는데, 대부분은 쉬고 있어요. 풀러를 두면 많은 클라이언트 연결을 적은 수의 실제 DB 연결로 묶어 쓸 수 있어서 DB 쪽 프로세스 수를 낮게 유지할 수 있어요.</p>
+          <p>PostgreSQL은 연결마다 운영체제 프로세스를 하나씩 만들어요. 프로세스는 스레드보다 생성 비용이 크고 메모리를 더 쓰며, 수가 많아지면 문맥 전환과 내부 자료구조 경합, 트랜잭션 목록을 확인하는 비용이 커져요. 애플리케이션 서버가 여러 대이고 각자 풀을 가지면 DB 쪽 연결 수는 그 곱이 되는데, 대부분은 쉬고 있어요. 풀러를 두면 많은 클라이언트 연결을 적은 수의 실제 DB 연결로 묶어 쓸 수 있어서 DB 쪽 프로세스 수를 낮게 유지할 수 있어요.</p>
         </div></details>
       </div>
       <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
@@ -101,46 +94,39 @@
       <h2>2장 MVCC와 튜플 버전</h2>
       <p class="lead">UPDATE는 새 행을 쓰는 것이다</p>
 
-      <h3>InnoDB와의 차이</h3>
-      <p>둘 다 MVCC로 "읽기가 쓰기를 막지 않게" 해요. 옛 버전을 두는 곳이 달라요.</p>
-      <ul>
-        <li><b>InnoDB</b>: 행을 제자리에서 고치고, 옛 버전은 별도의 <b>언두 로그</b>에 둬요.</li>
-        <li><b>PostgreSQL</b>: 옛 행을 그대로 두고 <b>새 행을 테이블 안에 추가</b>해요. 옛 버전과 새 버전이 같은 테이블에 나란히 있어요.</li>
-      </ul>
-      <h3>튜플의 숨은 컬럼</h3>
-      <p>모든 행(튜플)에는 두 값이 붙어 있어요.</p>
-      <ul>
-        <li><b>xmin</b>: 이 튜플을 만든 트랜잭션의 ID.</li>
-        <li><b>xmax</b>: 이 튜플을 삭제하거나 갱신한 트랜잭션의 ID. 아직 유효하면 비어 있어요.</li>
-      </ul>
-      <div class="tbl"><table>
-        <tr><th>연산</th><th>실제로 일어나는 일</th></tr>
-        <tr><td>INSERT</td><td>새 튜플 추가(xmin = 내 트랜잭션)</td></tr>
-        <tr><td>DELETE</td><td>기존 튜플의 xmax를 설정. 튜플은 그대로 남음</td></tr>
-        <tr><td>UPDATE</td><td>기존 튜플의 xmax 설정 + <b>새 튜플 추가</b></td></tr>
-      </table></div>
-      <h3>가시성 판단</h3>
-      <p>쿼리는 시작할 때 <b>스냅샷</b>(어떤 트랜잭션이 커밋됐고 어떤 것이 진행 중인지)을 받아요. 튜플을 읽을 때마다 xmin과 xmax를 스냅샷과 비교해 "내게 보이는 버전인가"를 판단해요.</p>
+      <h3>문제: UPDATE만 했는데 테이블이 두 배가 됐다</h3>
+      <p>정산 서비스에는 판매자별 "오늘 정산 예정 금액"을 담은 테이블이 있어요. 주문이 들어올 때마다 해당 판매자의 행을 UPDATE해요. 행 수는 판매자 수만큼, 5만 개로 일정한데, 테이블 파일 크기는 며칠 만에 처음의 두 배가 됐어요. 행이 늘지 않았는데 왜 커졌을까요?</p>
+
+      <h3>옛 버전을 어디에 두는가</h3>
+      <p>MySQL과 PostgreSQL은 둘 다 MVCC로 "읽기가 쓰기를 막지 않게" 해요(데이터베이스 챕터 4장). 어떤 트랜잭션이 행을 고치는 동안에도 다른 트랜잭션은 고치기 전의 값을 읽을 수 있어야 해요. 그러려면 옛 버전을 어딘가에 둬야 하는데, 두는 곳이 달라요.</p>
+      <p><b>InnoDB</b>는 행을 제자리에서 고치고, 옛 버전은 별도의 <b>언두 로그</b>에 둬요. <b>PostgreSQL</b>은 옛 행을 그대로 두고 <b>새 행을 테이블 안에 추가</b>해요. 옛 버전과 새 버전이 같은 테이블에 나란히 있어요. PostgreSQL에서는 행의 버전 하나하나를 <b>튜플</b>이라고 불러요.</p>
+
+      <h3>튜플마다 붙은 두 숫자</h3>
+      <p>모든 튜플에는 두 값이 숨어 있어요. <b>xmin</b>은 이 튜플을 만든 트랜잭션의 번호이고, <b>xmax</b>는 이 튜플을 지우거나 새 버전으로 대체한 트랜잭션의 번호예요(아직 살아 있으면 비어 있어요).</p>
+      <figure class="diagram">
+              <svg width="620" viewBox="0 0 620 176" role="img" aria-label="UPDATE는 옛 튜플에 xmax를 채우고 새 튜플을 추가한다. 스냅샷에 따라 보이는 버전이 다르다"><rect x="16" y="14" width="330" height="150" rx="10" class="dg-none"/><text x="26" y="30" class="dg-tm">테이블 페이지 (판매자 7)</text><rect x="34" y="40" width="294" height="52" rx="8" class="dg-soft"/><text x="181" y="63" text-anchor="middle" class="dg-tb">정산 예정 120,000</text><text x="181" y="79" text-anchor="middle" class="dg-tm">xmin 100 · xmax 105</text><rect x="34" y="104" width="294" height="52" rx="8" class="dg-ok"/><text x="181" y="127" text-anchor="middle" class="dg-tb">정산 예정 135,000</text><text x="181" y="143" text-anchor="middle" class="dg-tm">xmin 105 · xmax 없음</text><rect x="400" y="40" width="204" height="52" rx="8" class="dg-acc"/><text x="502" y="63" text-anchor="middle" class="dg-tb">트랜잭션 103의 조회</text><text x="502" y="79" text-anchor="middle" class="dg-tm">105는 아직 안 보임</text><rect x="400" y="104" width="204" height="52" rx="8" class="dg-acc"/><text x="502" y="127" text-anchor="middle" class="dg-tb">트랜잭션 107의 조회</text><text x="502" y="143" text-anchor="middle" class="dg-tm">105가 커밋됨</text><path d="M398 66 L332 66" class="dg-la"/><path d="M398 130 L332 130" class="dg-la"/></svg>
+              <figcaption>UPDATE는 옛 튜플에 xmax를 채우고 새 튜플을 추가한다. 스냅샷에 따라 보이는 버전이 다르다</figcaption>
+            </figure>
+      <p>INSERT는 xmin이 내 트랜잭션 번호인 새 튜플을 추가해요. DELETE는 튜플을 지우지 않고 xmax만 채워요. <b>UPDATE는 옛 튜플의 xmax를 채우고 새 튜플을 하나 더 추가</b>해요. 쿼리는 시작할 때 "어느 트랜잭션이 커밋됐고 어느 것이 진행 중인지"의 <b>스냅샷</b>을 받고, 튜플을 읽을 때마다 xmin과 xmax를 스냅샷과 비교해서 "나에게 보이는 버전인가"를 판단해요.</p>
+
       <h3>죽은 튜플</h3>
-      <p>삭제되거나 갱신으로 대체된 옛 튜플은, 그것을 볼 수 있는 트랜잭션이 하나도 남지 않으면 <b>죽은 튜플</b>이 돼요. 공간을 차지하지만 아무에게도 보이지 않아요. 누군가 치워야 해요. 그것이 VACUUM이에요.</p>
-      <h3>UPDATE의 비용</h3>
-      <p>새 튜플은 위치가 달라서, 원칙적으로 <b>모든 인덱스</b>에 새 항목을 추가해야 해요. 바뀌지 않은 컬럼의 인덱스도요. 예외가 <b>HOT 업데이트</b>예요. 인덱스가 걸린 컬럼이 하나도 바뀌지 않았고 같은 페이지에 빈 공간이 있으면 인덱스를 건드리지 않아요.</p>
+      <p>대체된 옛 튜플은, 그것을 볼 수 있는 트랜잭션이 하나도 남지 않으면 <b>죽은 튜플</b>이 돼요. 아무에게도 보이지 않지만 자리는 차지해요. 위 문제의 답이에요. 판매자 5만 명의 행을 하루에 수십 번씩 UPDATE하니 죽은 튜플이 수백만 개 쌓였고, 이것을 치우는 일(VACUUM, 3장)이 쌓이는 속도를 따라가지 못한 거예요.</p>
 
-      <div class="backend"><b>백엔드에서는</b> 자주 갱신되는 컬럼(조회수, 마지막 접속 시각, 상태)에 인덱스를 걸면 그 컬럼이 바뀔 때마다 HOT 업데이트가 불가능해져서 모든 인덱스가 갱신돼요. 자주 바뀌는 값과 잘 안 바뀌는 큰 값(본문, JSON)이 한 행에 있으면 작은 값을 고칠 때마다 행 전체의 새 버전이 생겨요. 테이블을 나누는 것을 검토하세요.</div>
+      <h3>UPDATE가 인덱스까지 건드린다</h3>
+      <p>새 튜플은 다른 위치에 생기니, 원칙적으로는 <b>모든 인덱스</b>에 새 위치를 가리키는 항목을 추가해야 해요. 바꾸지 않은 컬럼의 인덱스까지요. 예외가 <b>HOT 업데이트</b>예요. 바뀐 컬럼이 어떤 인덱스에도 들어 있지 않고, 새 튜플이 같은 페이지 안에 들어갈 자리가 있으면, 인덱스는 건드리지 않고 옛 튜플에서 새 튜플로 이어지는 연결만 만들어요.</p>
 
-      <div class="senior"><b>시니어 심화</b> <ul>
-          <li><b>fillfactor</b>: 페이지를 꽉 채우지 않고 여유를 남기면 같은 페이지 안에서 새 버전을 쓸 수 있어 HOT 업데이트 비율이 올라가요. 갱신이 많은 테이블에서 낮춰 볼 만해요. <code>pg_stat_user_tables</code>의 HOT 갱신 수로 효과를 확인해요.</li>
-          <li><b>롤백은 싸고 정리는 비싸요.</b> InnoDB는 롤백할 때 언두를 적용해 되돌려야 해요. PostgreSQL은 그 트랜잭션이 취소됐다고 표시만 하면 끝이에요. 대신 취소된 트랜잭션이 쓴 튜플은 죽은 튜플로 남아 나중에 치워야 해요.</li>
-          <li><b>큰 값은 따로 저장</b>돼요(TOAST). 큰 컬럼을 건드리지 않는 갱신은 그 값을 다시 쓰지 않지만, <code>SELECT *</code>는 매번 따로 저장된 큰 값까지 읽어 와요.</li>
-        </ul></div>
+      <div class="backend"><b>백엔드에서는</b> 자주 바뀌는 컬럼(정산 예정 금액, 마지막 접속 시각, 조회수)에 인덱스를 걸면 그 컬럼이 바뀔 때마다 HOT 업데이트가 불가능해져서 모든 인덱스가 함께 갱신돼요. 그 컬럼의 인덱스가 정말 필요한지 먼저 확인하세요. 그리고 자주 바뀌는 작은 값과 잘 안 바뀌는 큰 값(긴 설명, JSON)이 한 행에 있으면, 작은 값 하나를 고칠 때마다 행 전체의 새 버전이 생겨요. 테이블을 나누는 것을 검토하세요.</div>
+
+      <div class="senior"><b>시니어 심화</b> HOT 업데이트가 되려면 "같은 페이지에 빈자리"가 있어야 해요. 기본 설정에서는 페이지를 꽉 채워 쓰기 때문에, 갱신이 잦은 테이블은 빈자리가 없어 HOT이 잘 안 돼요. 테이블의 <b>fillfactor</b>를 낮춰(예: 80) 페이지마다 여유를 남기면 같은 페이지 안에 새 버전을 쓸 수 있어 HOT 비율이 올라가요. 대가로 테이블이 처음부터 조금 커져요. <code>pg_stat_user_tables</code>의 전체 갱신 수와 HOT 갱신 수(<code>n_tup_upd</code>, <code>n_tup_hot_upd</code>)를 비교해 효과를 확인해요.
+        <p>InnoDB와 비교해 생각해 볼 점도 있어요. <b>롤백은 PostgreSQL이 싸요.</b> InnoDB는 롤백할 때 언두 로그를 적용해 되돌려야 하지만, PostgreSQL은 그 트랜잭션이 취소됐다고 표시만 하면 끝이에요. 그 트랜잭션이 쓴 튜플은 아무에게도 안 보이는 죽은 튜플이 될 뿐이에요. 대신 <b>정리는 PostgreSQL이 비싸요.</b> 그 죽은 튜플을 누군가 나중에 치워야 해요. 큰 값은 따로 저장되는데(TOAST), 그 컬럼을 건드리지 않는 UPDATE는 큰 값을 다시 쓰지 않지만 <code>SELECT *</code>는 매번 따로 저장된 큰 값까지 읽어 와요.</p></div>
 
       <div class="summary"><span class="label">핵심 정리</span>
-        <ul><li>PostgreSQL은 옛 버전을 테이블 안에 남김. UPDATE = 삭제 표시 + 새 튜플</li><li>xmin/xmax와 스냅샷으로 가시성 판단</li><li>죽은 튜플이 쌓임. HOT 업데이트가 아니면 모든 인덱스 갱신</li></ul>
+        <ul><li>PostgreSQL은 옛 버전을 테이블 안에 남김. UPDATE = 옛 튜플에 xmax + 새 튜플 추가</li><li>xmin/xmax와 스냅샷으로 보이는 버전을 판단</li><li>죽은 튜플이 쌓임. HOT 업데이트가 아니면 모든 인덱스가 함께 갱신</li></ul>
       </div>
       <div class="check"><span class="label">셀프 체크</span>
         <ol><li>PostgreSQL에서 인덱스가 5개인 테이블의, 인덱스가 걸리지 않은 컬럼 하나를 UPDATE할 때 인덱스는 어떻게 되나요?</li></ol>
         <details class="answer"><summary>답 보기</summary><div class="a">
-          <p>UPDATE는 새 튜플을 만드는데 새 튜플은 물리 위치가 달라요. 인덱스는 물리 위치를 가리키므로 원칙적으로는 인덱스 5개 모두에 새 위치를 가리키는 항목을 추가해야 해요. 다만 바뀐 컬럼이 어떤 인덱스에도 포함되지 않고, 새 튜플이 같은 페이지 안에 들어갈 공간이 있으면 HOT 업데이트가 적용돼요. 이 경우 인덱스는 건드리지 않고 옛 튜플에서 새 튜플로 이어지는 연결만 만들어요. 페이지에 빈 공간이 없으면 HOT이 안 돼서 5개 모두 갱신돼요.</p>
+          <p>UPDATE는 새 튜플을 만들고, 새 튜플은 물리적 위치가 달라요. 인덱스는 물리적 위치를 가리키므로 원칙적으로는 5개 인덱스 모두에 새 위치를 가리키는 항목을 추가해야 해요. 다만 바뀐 컬럼이 어떤 인덱스에도 들어 있지 않고, 새 튜플이 같은 페이지 안에 들어갈 자리가 있으면 HOT 업데이트가 돼요. 이때는 인덱스를 건드리지 않고 옛 튜플에서 새 튜플로 이어지는 연결만 만들어요. 페이지에 빈자리가 없으면 HOT이 안 돼서 5개 모두 갱신돼요.</p>
         </div></details>
       </div>
       <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
@@ -150,39 +136,36 @@
       <h2>3장 VACUUM, 팽창, 트랜잭션 ID 고갈</h2>
       <p class="lead">치우지 않으면 느려지고, 끝내는 멈춘다</p>
 
-      <h3>VACUUM이 하는 일</h3>
-      <ul>
-        <li><b>죽은 튜플 회수</b>: 그 공간을 "재사용 가능"으로 표시해요. 파일 크기를 줄이는 것이 아니에요. 이후의 INSERT와 UPDATE가 그 자리를 써요.</li>
-        <li><b>가시성 맵 갱신</b>: 모든 튜플이 누구에게나 보이는 페이지를 표시해요. 인덱스만으로 답하는 스캔이 이 맵 덕분에 테이블을 안 읽어요.</li>
-        <li><b>통계 갱신</b>(ANALYZE): 옵티마이저가 쓰는 분포 정보.</li>
-        <li><b>트랜잭션 ID 동결</b>: 아래에서 설명해요.</li>
-      </ul>
-      <h3>autovacuum</h3>
-      <p>테이블별로 죽은 튜플이 임계값을 넘으면 자동으로 VACUUM을 돌려요. 임계값은 "고정 수 + 테이블 크기의 일정 비율"이라, <b>큰 테이블은 기본 설정으로는 너무 드물게</b> 돌아요. 행이 수억 개면 수천만 개가 죽어야 시작해요. 큰 테이블은 테이블 단위로 비율을 낮춰요.</p>
-      <h3>팽창(bloat)</h3>
-      <p>죽은 튜플이 회수되는 속도보다 빨리 쌓이면 테이블과 인덱스가 실제 데이터보다 훨씬 커져요. 같은 데이터를 읽는 데 더 많은 페이지를 읽어야 하니 전부 느려져요.</p>
-      <p>한번 커진 파일은 일반 VACUUM으로 줄지 않아요. <code>VACUUM FULL</code>은 테이블을 새로 쓰면서 줄이지만 <b>테이블 전체를 잠가요.</b> 운영 중에는 온라인으로 재구성하는 확장(pg_repack 등)을 써요.</p>
-      <h3>VACUUM을 막는 것</h3>
-      <p>VACUUM은 <b>아직 누군가 볼 수 있는</b> 튜플은 못 치워요. 아래가 있으면 그 시점 이후의 죽은 튜플은 전부 남아요.</p>
-      <ul>
-        <li><b>오래 열린 트랜잭션</b>(<code>idle in transaction</code> 포함).</li>
-        <li>따라오지 못하는 <b>복제 슬롯</b>.</li>
-        <li>끝나지 않은 준비된(2단계 커밋) 트랜잭션.</li>
-      </ul>
-      <p>"autovacuum이 도는데도 테이블이 계속 커진다"면 이 셋을 먼저 봐요.</p>
-      <h3>트랜잭션 ID 고갈</h3>
-      <p>트랜잭션 ID는 32비트예요. 약 40억 개를 쓰면 한 바퀴 돌아요. 가시성 판단은 ID의 선후 비교라서, 한 바퀴 돌면 아주 오래된 튜플이 "미래의 것"으로 보여 사라진 것처럼 돼요.</p>
-      <p>이를 막으려고 VACUUM이 충분히 오래된 튜플을 <b>동결</b>(항상 보이는 것으로 표시)해요. 동결이 계속 밀리면 PostgreSQL은 데이터 보호를 위해 <b>새 쓰기 트랜잭션을 거부</b>해요. 전체 서비스 중단이에요.</p>
+      <h3>문제: autovacuum이 도는데 테이블이 계속 커진다</h3>
+      <p>2장의 정산 예정 금액 테이블을 보니 autovacuum은 몇 분마다 잘 돌고 있었어요. 그런데도 죽은 튜플 수가 줄지 않고 테이블은 계속 커졌어요. 일주일 뒤에는 이 테이블을 쓰는 모든 쿼리가 세 배쯤 느려졌어요.</p>
 
-      <div class="backend"><b>백엔드에서는</b> 모니터링할 것은 세 가지예요. 테이블별 죽은 튜플 수와 마지막 autovacuum 시각(<code>pg_stat_user_tables</code>), 가장 오래된 트랜잭션의 나이(<code>pg_stat_activity</code>의 <code>xact_start</code>), 데이터베이스별 트랜잭션 ID 나이(<code>age(datfrozenxid)</code>). 마지막 값이 계속 오르기만 하면 동결이 밀리고 있는 것이니, 한도에 가까워지기 훨씬 전에 알람이 울리게 하세요.</div>
+      <h3>VACUUM이 하는 일</h3>
+      <p>VACUUM은 죽은 튜플의 자리를 "<b>재사용 가능</b>"으로 표시해요. 파일 크기를 줄이는 것이 아니라, 이후의 INSERT와 UPDATE가 그 자리를 쓰게 하는 거예요. 그 밖에도 모든 튜플이 누구에게나 보이는 페이지를 표시하고(가시성 맵, 4장의 인덱스 전용 스캔이 이것을 써요), 옵티마이저가 쓰는 통계를 갱신하고(ANALYZE), 트랜잭션 ID를 동결해요(아래).</p>
+      <p><b>autovacuum</b>은 테이블마다 죽은 튜플이 일정 기준을 넘으면 자동으로 VACUUM을 돌려요. 기준은 "고정 개수 + 테이블 크기의 일정 비율"이라, <b>큰 테이블일수록 너무 늦게</b> 돌아요. 행이 수억 개인 테이블은 기본 설정으로는 수천만 개가 죽어야 시작해요. 큰 테이블은 테이블 단위로 비율을 낮춰 줘요.</p>
+
+      <h3>VACUUM이 치우지 못하는 것</h3>
+      <figure class="diagram">
+              <svg width="671" viewBox="0 0 671 92" role="img" aria-label="오래 열린 트랜잭션 하나가 그 이후의 모든 정리를 막는다"><rect x="12" y="26" width="147" height="52" rx="8" class="dg-warn"/><text x="85.5" y="49" text-anchor="middle" class="dg-tb">3일째 열린 트랜잭션</text><text x="85.5" y="65" text-anchor="middle" class="dg-tm">정산 배치 서버</text><path d="M161 52 L200 52" class="dg-l"/><rect x="203" y="26" width="142" height="52" rx="8" class="dg-soft"/><text x="274" y="49" text-anchor="middle" class="dg-tb">VACUUM</text><text x="274" y="65" text-anchor="middle" class="dg-tm">그 이후 튜플은 못 치움</text><path d="M347 52 L386 52" class="dg-l"/><rect x="389" y="26" width="113" height="52" rx="8" class="dg-box"/><text x="445.5" y="56" text-anchor="middle" class="dg-tb">죽은 튜플 누적</text><path d="M504 52 L543 52" class="dg-l"/><rect x="546" y="26" width="113" height="52" rx="8" class="dg-warn"/><text x="602.5" y="49" text-anchor="middle" class="dg-tb">팽창</text><text x="602.5" y="65" text-anchor="middle" class="dg-tm">모든 쿼리 느려짐</text></svg>
+              <figcaption>오래 열린 트랜잭션 하나가 그 이후의 모든 정리를 막는다</figcaption>
+            </figure>
+      <p>위 문제는 autovacuum이 늦어서가 아니었어요. VACUUM은 <b>아직 누군가 볼 수 있는</b> 튜플은 치울 수 없어요. 어떤 트랜잭션이 3일 전에 시작해서 아직 끝나지 않았다면, 그 트랜잭션의 스냅샷으로 보면 3일 전 이후에 대체된 튜플은 전부 "아직 보일 수 있는" 튜플이에요. 정산 배치 서버 한 대가 트랜잭션을 연 채로 멈춰 있었던 거예요(1장의 <code>idle in transaction</code>).</p>
+      <p>VACUUM을 막는 것은 세 가지예요. <b>오래 열린 트랜잭션</b>, 소비자가 따라오지 못하는 <b>복제 슬롯</b>(6장), 커밋도 롤백도 안 된 <b>준비된 트랜잭션</b>(2단계 커밋). "autovacuum이 도는데 테이블이 계속 커진다"면 이 셋을 먼저 봐요.</p>
+
+      <h3>팽창</h3>
+      <p>죽은 튜플이 치워지는 속도보다 빨리 쌓이면 테이블과 인덱스가 실제 데이터보다 훨씬 커져요. 이것을 <b>팽창</b>(bloat)이라고 해요. 같은 데이터를 읽는 데 더 많은 페이지를 읽어야 하니 모든 쿼리가 느려지고, 캐시에 담을 수 있는 실제 데이터도 줄어요. 한번 커진 파일은 일반 VACUUM으로 줄지 않아요. <code>VACUUM FULL</code>은 테이블을 새로 써서 줄이지만 그동안 <b>테이블 전체를 잠가요.</b> 운영 중에는 잠금 없이 재구성하는 확장 도구(pg_repack 등)를 써요.</p>
+
+      <h3>트랜잭션 ID 고갈</h3>
+      <p>트랜잭션 번호는 32비트라 약 40억 개를 쓰면 한 바퀴 돌아요. 보이는지는 번호의 앞뒤로 판단하니, 한 바퀴 돌면 아주 오래된 튜플이 "미래의 것"으로 보여 사라진 것처럼 돼요. 이를 막으려고 VACUUM은 충분히 오래된 튜플을 "누구에게나 보이는 것"으로 <b>동결</b>해요. 그런데 위의 이유로 VACUUM이 오래 막혀 동결이 계속 밀리면, PostgreSQL은 데이터를 지키려고 결국 <b>새 쓰기 트랜잭션을 거부</b>해요. 서비스 전체가 멈춰요.</p>
+
+      <div class="backend"><b>백엔드에서는</b> 모니터링할 것은 세 가지예요. 테이블별 죽은 튜플 수와 마지막 autovacuum 시각(<code>pg_stat_user_tables</code>), 가장 오래 열린 트랜잭션의 나이(<code>pg_stat_activity</code>의 <code>xact_start</code>), 데이터베이스별 트랜잭션 ID 나이(<code>age(datfrozenxid)</code>). 마지막 값이 계속 오르기만 하면 동결이 밀리고 있는 거예요. 한도에 가까워지기 훨씬 전에 알람이 울리게 하세요.</div>
 
       <div class="summary"><span class="label">핵심 정리</span>
-        <ul><li>VACUUM = 죽은 튜플 공간 재사용 표시 + 가시성 맵 + 동결. 파일은 안 줄어듦</li><li>큰 테이블은 autovacuum 임계값을 낮춤. 긴 트랜잭션이 VACUUM을 막음</li><li>트랜잭션 ID는 유한. 동결이 밀리면 쓰기가 멈춤</li></ul>
+        <ul><li>VACUUM = 죽은 튜플 자리 재사용 + 가시성 맵 + 통계 + 동결. 파일은 안 줄어듦</li><li>오래 열린 트랜잭션·복제 슬롯·준비된 트랜잭션이 VACUUM을 막음. 큰 테이블은 autovacuum 기준을 낮춤</li><li>트랜잭션 ID는 유한. 동결이 밀리면 쓰기가 멈춤</li></ul>
       </div>
       <div class="check"><span class="label">셀프 체크</span>
         <ol><li>autovacuum이 정상적으로 실행되는데도 죽은 튜플이 줄지 않습니다. 무엇을 확인해야 하나요?</li></ol>
         <details class="answer"><summary>답 보기</summary><div class="a">
-          <p>VACUUM은 어떤 트랜잭션이라도 아직 볼 수 있는 튜플은 치우지 못해요. 그래서 가장 오래된 스냅샷을 붙잡고 있는 것을 찾아야 해요. 첫째, 오래 열려 있는 트랜잭션이에요. 쿼리는 끝났지만 커밋하지 않고 방치된 연결도 포함돼요. 둘째, 소비되지 않고 있는 복제 슬롯이에요. 셋째, 커밋도 롤백도 되지 않은 준비된 트랜잭션이에요. 넷째, 복제본에서 긴 쿼리가 돌고 있고 그 정보를 주 서버로 되먹이는 설정이 켜진 경우예요. 이 중 하나라도 있으면 그 시점 이후에 죽은 튜플은 VACUUM이 몇 번을 돌아도 남아요.</p>
+          <p>VACUUM은 어떤 트랜잭션이라도 아직 볼 수 있는 튜플은 치우지 못해요. 그래서 가장 오래된 스냅샷을 붙잡고 있는 것을 찾아야 해요. 첫째, 오래 열려 있는 트랜잭션이에요. 쿼리는 끝났지만 커밋하지 않고 방치된 연결도 포함돼요. 둘째, 소비되지 않고 있는 복제 슬롯이에요. 셋째, 커밋도 롤백도 되지 않은 준비된 트랜잭션이에요. 넷째, 복제본에서 긴 쿼리가 돌고 그 정보를 주 서버에 알려 주는 설정이 켜진 경우예요. 이 중 하나라도 있으면 그 시점 이후에 죽은 튜플은 VACUUM이 몇 번을 돌아도 남아요.</p>
         </div></details>
       </div>
       <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
@@ -195,44 +178,46 @@
       <h2>4장 인덱스 종류</h2>
       <p class="lead">B-Tree 말고도 고를 것이 있다</p>
 
-      <h3>인덱스 유형</h3>
+      <h3>문제: 대기 중인 정산 건 조회가 느리다</h3>
+      <p>정산 테이블에는 2년 치 정산 건이 3억 행 있어요. 매분 도는 정산 처리 작업은 <code>WHERE status = 'PENDING' ORDER BY created_at</code>으로 대기 중인 건을 가져오는데, 대기 중인 건은 전체의 0.1%뿐이에요. <code>status</code>에 일반 B-Tree 인덱스를 걸어 두었는데, 인덱스 자체가 수 GB라 메모리에 다 올라가지 않고 조회가 느려요.</p>
+
+      <h3>필요한 행만 색인한다</h3>
+      <p>PostgreSQL에는 <b>부분 인덱스</b>가 있어요. 조건에 맞는 행만 인덱스에 넣어요.</p>
+      <pre><code>CREATE INDEX settlement_pending_idx
+          ON settlement (created_at)
+          WHERE status = 'PENDING';</code></pre>
+      <figure class="diagram">
+              <svg width="620" viewBox="0 0 620 130" role="img" aria-label="대기 중인 0.1%만 색인한 부분 인덱스는 작아서 메모리에 올라가고, 완료된 행의 변경과 무관하다"><rect x="120" y="20" width="480" height="34" rx="8" class="dg-soft"/><text x="360" y="41" text-anchor="middle" class="dg-tb">3억 행 전부 · 수 GB</text><rect x="120" y="80" width="60" height="34" rx="8" class="dg-ok"/><text x="150" y="101" text-anchor="middle" class="dg-tb">30만</text><text x="16" y="40" text-anchor="start" class="dg-tb">일반 인덱스</text><text x="16" y="100" text-anchor="start" class="dg-tb">부분 인덱스</text></svg>
+              <figcaption>대기 중인 0.1%만 색인한 부분 인덱스는 작아서 메모리에 올라가고, 완료된 행의 변경과 무관하다</figcaption>
+            </figure>
+      <p>대기 중인 30만 건만 색인하니 인덱스가 수 MB로 작아져 메모리에 쉽게 올라가요. 완료된 99.9%의 행은 인덱스에 없으니 그 행들이 바뀌어도 이 인덱스는 갱신할 일이 없어요. 인덱스 키를 <code>created_at</code>으로 하니 정렬도 인덱스 순서 그대로 돼요. 쿼리의 조건이 인덱스의 조건과 맞아야 이 인덱스를 써요.</p>
+
+      <h3>B-Tree 말고 다른 인덱스</h3>
       <div class="tbl"><table>
-        <tr><th>유형</th><th>잘하는 것</th><th>예</th></tr>
-        <tr><td>B-Tree</td><td>등호, 범위, 정렬. 기본값</td><td>대부분의 컬럼</td></tr>
-        <tr><td>Hash</td><td>등호만</td><td>쓸 일이 드묾</td></tr>
-        <tr><td>GIN</td><td>하나의 값 안에 여러 요소가 있는 것의 포함 검색</td><td>배열, JSONB, 전문 검색</td></tr>
-        <tr><td>GiST</td><td>겹침, 포함, 가까움 같은 관계</td><td>범위 타입, 지리 정보</td></tr>
-        <tr><td>BRIN</td><td>물리적 순서와 값이 연관된 아주 큰 테이블</td><td>시간순으로 쌓이는 로그</td></tr>
+        <tr><th>유형</th><th>잘하는 것</th><th>정산 서비스에서</th></tr>
+        <tr><td>B-Tree</td><td>같음, 범위, 정렬. 기본값</td><td>대부분의 컬럼</td></tr>
+        <tr><td>GIN</td><td>값 하나에 여러 요소가 든 것의 포함 검색</td><td>JSONB 속성, 태그 배열, 전문 검색</td></tr>
+        <tr><td>GiST</td><td>겹침, 포함, 가까움 같은 관계</td><td>정산 기간(범위 타입)이 겹치는지</td></tr>
+        <tr><td>BRIN</td><td>물리적 순서와 값이 함께 가는 아주 큰 테이블</td><td>시간순으로만 쌓이는 정산 로그의 시각</td></tr>
       </table></div>
-      <h3>GIN</h3>
-      <p>행 하나가 여러 키를 가질 때 써요. 키마다 그 키를 가진 행의 목록을 저장하는 역색인 구조예요. JSONB 컬럼에 "이 키-값을 포함하는 문서"를 찾거나 배열에 "이 요소가 들어 있는 행"을 찾을 때 맞아요. 조회는 빠르지만 <b>쓰기가 느려요.</b> 행 하나가 인덱스 항목 여러 개를 만들어요.</p>
-      <h3>BRIN</h3>
-      <p>페이지 묶음마다 "이 구간의 최솟값과 최댓값"만 저장해요. 크기가 B-Tree의 수백분의 1이에요. 값이 물리적 순서와 맞을 때만 효과가 있어요. 시각 순으로만 추가되는 테이블의 시각 컬럼이 대표적이에요.</p>
-      <h3>MySQL에 없거나 다른 기능</h3>
-      <ul>
-        <li><b>부분 인덱스</b>: 조건에 맞는 행만 인덱스에 넣어요. <code>WHERE status = 'PENDING'</code>인 행만 색인하면 작고 빨라요.</li>
-        <li><b>표현식 인덱스</b>: <code>lower(email)</code>처럼 계산 결과에 인덱스.</li>
-        <li><b>커버링(INCLUDE)</b>: 검색 키는 아니지만 인덱스에 함께 담아 둘 컬럼을 지정.</li>
-        <li><b>동시 생성</b>: <code>CREATE INDEX CONCURRENTLY</code>는 쓰기를 막지 않고 만들어요.</li>
-      </ul>
-      <h3>인덱스 전용 스캔의 조건</h3>
-      <p>PostgreSQL의 인덱스에는 가시성 정보가 없어요. 인덱스에 필요한 컬럼이 다 있어도, 그 튜플이 내게 보이는지 확인하려면 테이블을 읽어야 해요. <b>가시성 맵</b>에 "이 페이지는 전부 보임"으로 표시된 페이지만 테이블 읽기를 건너뛰어요. 그래서 VACUUM이 밀리면 인덱스 전용 스캔이 느려져요.</p>
+      <p><b>GIN</b>은 행 하나가 여러 키를 가질 때 써요. 키마다 그 키를 가진 행의 목록을 저장하는 역색인 구조라(검색 엔진 챕터 1장), JSONB 속성에 특정 키-값이 있는 행을 찾을 때 빨라요. 대신 행 하나가 인덱스 항목 여러 개를 만들어서 <b>쓰기가 느려요.</b> <b>BRIN</b>은 페이지 묶음마다 "이 구간의 최솟값과 최댓값"만 저장해서 B-Tree보다 수백 배 작아요. 시각 순으로만 추가되는 테이블의 시각 컬럼처럼 값이 물리적 순서와 맞을 때만 효과가 있어요.</p>
+      <p>그 밖에 계산 결과에 거는 <b>표현식 인덱스</b>(<code>lower(email)</code>), 검색 키는 아니지만 인덱스에 함께 담아 둘 컬럼을 지정하는 <code>INCLUDE</code>, 쓰기를 막지 않고 인덱스를 만드는 <code>CREATE INDEX CONCURRENTLY</code>가 있어요.</p>
 
-      <div class="backend"><b>백엔드에서는</b> 부분 인덱스는 "소수의 행만 자주 찾는" 패턴에 아주 잘 맞아요. 처리 대기 중인 작업, 삭제되지 않은 행, 활성 사용자처럼요. 그리고 부분 유니크 인덱스로 "삭제되지 않은 행 중에서만 이메일이 유일"처럼 조건부 유일성을 표현할 수 있어요. 소프트 삭제와 유니크 제약의 충돌을 푸는 방법이에요.</div>
+      <h3>인덱스만 읽고 끝나려면</h3>
+      <p>PostgreSQL의 인덱스에는 "이 튜플이 지금 보이는가"의 정보가 없어요. 필요한 컬럼이 다 인덱스에 있어도 보이는지 확인하려면 테이블을 읽어야 해요. 3장의 <b>가시성 맵</b>에 "이 페이지는 전부 보임"으로 표시된 페이지만 테이블 읽기를 건너뛰어요. 그래서 VACUUM이 밀리면 인덱스 전용 스캔도 느려져요.</p>
 
-      <div class="senior"><b>시니어 심화</b> <ul>
-          <li><b><code>CREATE INDEX CONCURRENTLY</code>는 실패할 수 있고</b>, 실패하면 무효 상태의 인덱스가 남아요. 그 인덱스는 조회에는 안 쓰이지만 쓰기 비용은 계속 내요. 마이그레이션 후 무효 인덱스가 없는지 확인하고 지워요. 트랜잭션 블록 안에서는 실행할 수 없어서 마이그레이션 도구의 설정도 봐야 해요.</li>
-          <li><b>인덱스도 팽창해요.</b> 갱신과 삭제가 많은 테이블의 인덱스는 시간이 갈수록 커지고 느려져요. <code>REINDEX CONCURRENTLY</code>로 잠금 없이 다시 만들어요.</li>
-          <li><b>안 쓰는 인덱스는 비용만 내요.</b> 쓰기마다 갱신되고 HOT 업데이트를 막아요. <code>pg_stat_user_indexes</code>의 스캔 횟수가 0인 인덱스를 주기적으로 찾아요. 복제본에서만 쓰이는 인덱스가 있을 수 있으니 복제본의 통계도 확인하세요.</li>
-        </ul></div>
+      <div class="backend"><b>백엔드에서는</b> 부분 인덱스는 "소수의 행만 자주 찾는" 패턴에 아주 잘 맞아요. 대기 중인 작업, 삭제되지 않은 행, 활성 사용자처럼요. 그리고 <b>부분 유니크 인덱스</b>로 "삭제되지 않은 행 중에서만 판매자 이메일이 유일"처럼 조건부 유일성을 표현할 수 있어요(<code>CREATE UNIQUE INDEX ... WHERE deleted_at IS NULL</code>). 소프트 삭제와 유니크 제약이 부딪히는 문제를 푸는 방법이에요.</div>
+
+      <div class="senior"><b>시니어 심화</b> <code>CREATE INDEX CONCURRENTLY</code>는 쓰기를 막지 않는 대신 <b>실패할 수 있고</b>, 실패하면 "무효" 상태의 인덱스가 남아요. 이 인덱스는 조회에는 쓰이지 않으면서 쓰기 비용은 계속 내요. 마이그레이션이 끝나면 무효 인덱스가 없는지(<code>pg_index.indisvalid</code>) 확인하고 지운 뒤 다시 만들어요. 또 이 명령은 트랜잭션 블록 안에서 실행할 수 없어서, 마이그레이션 도구가 각 파일을 트랜잭션으로 감싸는 설정이면 그 파일만 예외로 해야 해요.
+        <p>인덱스도 테이블처럼 <b>팽창해요.</b> 갱신과 삭제가 많은 테이블의 인덱스는 시간이 갈수록 커지고 느려져요. <code>REINDEX CONCURRENTLY</code>로 잠금 없이 다시 만들 수 있어요. 그리고 안 쓰는 인덱스는 비용만 내요. 쓰기마다 갱신되고, 2장의 HOT 업데이트를 막아요. <code>pg_stat_user_indexes</code>에서 스캔 횟수가 0인 인덱스를 주기적으로 찾되, 그 통계는 서버마다 따로라서 복제본에서만 쓰이는 인덱스일 수 있으니 복제본의 통계도 확인한 뒤 지워요.</p></div>
 
       <div class="summary"><span class="label">핵심 정리</span>
-        <ul><li>B-Tree 외에 GIN(포함 검색), GiST(관계), BRIN(순서와 연관된 거대 테이블)</li><li>부분·표현식·INCLUDE 인덱스, 동시 생성</li><li>인덱스 전용 스캔은 가시성 맵에 의존 → VACUUM이 중요</li></ul>
+        <ul><li>부분 인덱스·표현식 인덱스·INCLUDE·동시 생성</li><li>GIN(포함 검색, 쓰기 느림) · GiST(겹침·범위) · BRIN(순서와 맞는 거대 테이블)</li><li>인덱스 전용 스캔은 가시성 맵에 기댐 → VACUUM이 중요</li></ul>
       </div>
       <div class="check"><span class="label">셀프 체크</span>
         <ol><li>작업 큐 테이블에서 status가 PENDING인 행만 자주 조회합니다. 전체의 1%뿐일 때 어떤 인덱스가 적합한가요?</li></ol>
         <details class="answer"><summary>답 보기</summary><div class="a">
-          <p>조건이 붙은 부분 인덱스가 맞아요. status가 PENDING인 행만 색인하도록 만들면 인덱스 크기가 전체의 1% 수준이라 메모리에 쉽게 올라가고 탐색이 빨라요. 완료된 99%의 행은 인덱스에 없으니 그 행들의 다른 컬럼이 바뀌어도 이 인덱스를 갱신할 일이 없어요. status 전체에 일반 인덱스를 걸면 거의 쓰이지 않는 값들까지 다 담아 크기만 커져요. 처리 순서가 필요하면 인덱스 컬럼을 생성 시각으로 하고 조건절에 상태를 두면 돼요.</p>
+          <p>조건이 붙은 부분 인덱스가 맞아요. status가 PENDING인 행만 색인하면 인덱스 크기가 전체의 1% 수준이라 메모리에 쉽게 올라가고 찾기가 빨라요. 완료된 99%의 행은 인덱스에 없으니 그 행들의 다른 컬럼이 바뀌어도 이 인덱스를 갱신할 일이 없어요. status 전체에 일반 인덱스를 걸면 거의 쓰이지 않는 값들까지 담아 크기만 커져요. 처리 순서가 필요하면 인덱스 컬럼을 생성 시각으로 하고 조건절에 상태를 두면 정렬까지 인덱스로 해결돼요.</p>
         </div></details>
       </div>
       <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
@@ -242,47 +227,38 @@
       <h2>5장 격리 수준과 잠금</h2>
       <p class="lead">MySQL과 이름은 같아도 동작이 다르다</p>
 
-      <h3>격리 수준</h3>
-      <div class="tbl"><table>
-        <tr><th>수준</th><th>PostgreSQL의 동작</th></tr>
-        <tr><td>READ COMMITTED (기본)</td><td>문장마다 새 스냅샷</td></tr>
-        <tr><td>REPEATABLE READ</td><td>트랜잭션의 첫 문장에서 스냅샷 고정. 스냅샷 격리</td></tr>
-        <tr><td>SERIALIZABLE</td><td>스냅샷 격리 + 직렬화 위반 탐지(SSI)</td></tr>
-      </table></div>
-      <p>기본값부터 달라요. MySQL은 REPEATABLE READ, PostgreSQL은 READ COMMITTED예요.</p>
-      <h3>REPEATABLE READ의 차이</h3>
-      <ul>
-        <li><b>갱신 충돌</b>: 내 스냅샷 이후에 다른 트랜잭션이 고치고 커밋한 행을 내가 고치려 하면, PostgreSQL은 <b>에러를 내고 트랜잭션을 중단</b>시켜요. 갱신 손실이 자동으로 막히는 대신 애플리케이션이 재시도해야 해요. InnoDB는 같은 상황에서 최신 값 위에 그대로 갱신해요.</li>
-        <li><b>갭 락이 없어요.</b> 범위 잠금으로 삽입을 막지 않아요. 팬텀은 스냅샷으로 안 보이게 할 뿐이에요.</li>
-      </ul>
-      <h3>SERIALIZABLE (SSI)</h3>
-      <p>잠그지 않고 진행하다가, 트랜잭션들 사이의 읽기-쓰기 의존 관계에서 직렬 실행으로는 나올 수 없는 패턴을 탐지하면 한쪽을 중단시켜요. 쓰기 스큐까지 막아요. 대가는 <b>직렬화 실패 에러에 대한 재시도</b>가 필수라는 것과 추적 비용이에요.</p>
-      <h3>행 잠금</h3>
-      <p><code>SELECT ... FOR UPDATE</code>, <code>FOR SHARE</code>가 있고, <code>SKIP LOCKED</code>와 <code>NOWAIT</code>를 지원해요. 읽기는 쓰기를 막지 않고 쓰기도 읽기를 막지 않아요.</p>
-      <h3>DDL과 잠금 대기열</h3>
-      <p>대부분의 <code>ALTER TABLE</code>은 테이블에 가장 강한 잠금을 요구해요. 잠금 자체는 순간이어도 위험한 것은 <b>대기열</b>이에요.</p>
-      <ol>
-        <li>긴 조회가 테이블을 읽는 중이다.</li>
-        <li>ALTER가 강한 잠금을 요청하고 그 조회가 끝나길 기다린다.</li>
-        <li>그 뒤에 온 <b>모든 쿼리가 ALTER 뒤에 줄을 선다.</b> 평범한 SELECT도요.</li>
-      </ol>
-      <p>긴 조회 하나와 ALTER 하나가 만나면 테이블 전체가 멈춰요. DDL을 실행할 때는 <code>lock_timeout</code>을 짧게 걸어, 잠금을 못 얻으면 빨리 포기하고 다시 시도하게 해요.</p>
+      <h3>문제 1: MySQL에서 잘 되던 코드가 에러를 낸다</h3>
+      <p>MySQL에서 쓰던 정산 확정 코드를 PostgreSQL로 옮기면서 격리 수준을 REPEATABLE READ로 맞췄어요. 그런데 동시에 같은 판매자를 정산하는 요청이 오면 가끔 "could not serialize access due to concurrent update" 에러가 나요. MySQL에서는 이런 에러가 없었어요.</p>
 
-      <div class="backend"><b>백엔드에서는</b> PostgreSQL에서 REPEATABLE READ 이상을 쓰면 직렬화 실패(SQLSTATE 40001)를 받을 수 있어요. 이것은 버그가 아니라 정상 동작이고, 트랜잭션 전체를 처음부터 다시 실행해야 해요. 재시도 로직 없이 격리 수준만 올리면 간헐적인 에러로 나타나요. 그리고 DDL은 PostgreSQL에서 <b>트랜잭션 안에서 실행되고 롤백도 돼요.</b> 마이그레이션 여러 단계를 원자적으로 적용할 수 있어요.</div>
+      <h3>같은 이름, 다른 동작</h3>
+      <p>우선 기본값부터 달라요. MySQL의 기본 격리 수준은 REPEATABLE READ, PostgreSQL은 <b>READ COMMITTED</b>예요. 문장마다 새 스냅샷을 받아요.</p>
+      <p>REPEATABLE READ에서도 차이가 있어요. PostgreSQL에서는 트랜잭션의 첫 문장에서 스냅샷이 고정돼요. 그런데 내 스냅샷 <b>이후에</b> 다른 트랜잭션이 고치고 커밋한 행을 내가 고치려 하면, PostgreSQL은 <b>에러를 내고 트랜잭션을 중단</b>해요. 내가 본 값은 이미 낡았으니 그 위에 쓰면 상대의 변경을 덮어쓰게 되기 때문이에요(갱신 손실). InnoDB는 같은 상황에서 최신 값 위에 그대로 갱신해요. 위 에러가 바로 이것이고, 버그가 아니라 <b>정상 동작</b>이에요. 애플리케이션이 트랜잭션 전체를 처음부터 다시 실행하면 돼요.</p>
+      <p>또 PostgreSQL에는 InnoDB의 <b>갭 락이 없어요.</b> 범위를 잠가 그 사이의 INSERT를 막지 않아요. 대신 스냅샷으로 나중에 들어온 행을 안 보이게 할 뿐이에요.</p>
 
-      <div class="senior"><b>시니어 심화</b> <ul>
-          <li><b>안전한 스키마 변경 패턴</b>을 팀 규칙으로 두세요. 제약 추가는 "검증 없이 추가(<code>NOT VALID</code>) → 따로 검증(<code>VALIDATE CONSTRAINT</code>)" 두 단계로 나누면 긴 잠금을 피해요. 인덱스는 동시 생성으로, 컬럼 타입 변경처럼 테이블을 다시 쓰는 작업은 새 컬럼 추가와 점진적 복사로 대체해요.</li>
-          <li><b>잠금 대기 진단</b>: <code>pg_stat_activity</code>의 <code>wait_event</code>와 <code>pg_blocking_pids()</code>로 누가 누구를 막고 있는지 봐요. <code>log_lock_waits</code>를 켜면 일정 시간 이상 기다린 잠금이 로그에 남아요.</li>
-          <li><b>권고 잠금</b>(advisory lock)은 애플리케이션이 정한 키로 거는 잠금이에요. 배치 중복 실행 방지 같은 용도에 DB만으로 분산 락을 구현할 수 있어요. 세션 수준 잠금은 풀러의 트랜잭션 모드와 맞지 않으니 트랜잭션 수준 잠금을 써요.</li>
-        </ul></div>
+      <h3>SERIALIZABLE</h3>
+      <p>PostgreSQL의 SERIALIZABLE은 잠그지 않고 진행하다가, 트랜잭션들이 서로 읽고 쓴 관계를 추적해서 "하나씩 차례로 실행했다면 나올 수 없는 결과"가 될 패턴이 보이면 한쪽을 중단시켜요. 쓰기 왜곡(분산 시스템 챕터 7장)까지 막아요. 대가는 직렬화 실패 에러에 대한 재시도가 필수라는 것과 관계를 추적하는 비용이에요.</p>
+
+      <h3>문제 2: 컬럼 하나 추가했는데 서비스가 멈췄다</h3>
+      <p>정산 테이블에 컬럼을 추가하는 <code>ALTER TABLE</code>을 실행했어요. 순식간에 끝나는 작업인데, 실행한 순간 정산 테이블을 쓰는 모든 API가 멈췄다가 10분 뒤에 풀렸어요.</p>
+      <figure class="diagram">
+              <svg width="624" viewBox="0 0 624 202" role="img" aria-label="ALTER는 긴 조회가 끝나길 기다리고, 뒤에 온 평범한 조회들은 ALTER 뒤에 줄을 선다"><rect x="24" y="12" width="126" height="36" rx="8" class="dg-box"/><text x="87" y="34" text-anchor="middle" class="dg-tb">10분짜리 리포트</text><rect x="189" y="12" width="96" height="36" rx="8" class="dg-acc"/><text x="237" y="34" text-anchor="middle" class="dg-tb">정산 테이블</text><rect x="328.5" y="12" width="117" height="36" rx="8" class="dg-box"/><text x="387" y="34" text-anchor="middle" class="dg-tb">ALTER TABLE</text><rect x="474.5" y="12" width="125" height="36" rx="8" class="dg-box"/><text x="537" y="34" text-anchor="middle" class="dg-tb">정산 API 조회들</text><path d="M87 48 L87 192" class="dg-sep"/><path d="M237 48 L237 192" class="dg-sep"/><path d="M387 48 L387 192" class="dg-sep"/><path d="M537 48 L537 192" class="dg-sep"/><path d="M91 70 L231 70" class="dg-l"/><text x="162" y="63" text-anchor="middle" class="dg-tm">읽는 중 (약한 잠금)</text><path d="M383 102 L243 102" class="dg-lw"/><text x="312" y="95" text-anchor="middle" class="dg-tw">강한 잠금 요청 → 대기</text><path d="M533 134 L243 134" class="dg-lw"/><text x="387" y="127" text-anchor="middle" class="dg-tw">SELECT → ALTER 뒤에 줄섬</text><rect x="207" y="152" width="360" height="24" rx="6" class="dg-warn"/><text x="387" y="168" text-anchor="middle" class="dg-t">리포트가 끝날 때까지 테이블의 모든 쿼리 정지</text></svg>
+              <figcaption>ALTER는 긴 조회가 끝나길 기다리고, 뒤에 온 평범한 조회들은 ALTER 뒤에 줄을 선다</figcaption>
+            </figure>
+      <p>대부분의 <code>ALTER TABLE</code>은 테이블에 가장 강한 잠금이 필요해요. 잠금을 쥐는 시간은 짧아도, <b>잠금을 얻기까지</b> 그 테이블을 쓰고 있는 모든 트랜잭션이 끝나길 기다려요. 마침 10분짜리 정산 리포트 조회가 돌고 있었어요. 문제는 그다음이에요. 잠금 요청은 순서대로 처리되므로, ALTER 뒤에 도착한 평범한 SELECT들도 ALTER가 끝나길 기다리며 <b>줄을 서요.</b> 긴 조회 하나와 ALTER 하나가 만나 테이블 전체가 10분간 멈춘 거예요.</p>
+      <p>그래서 DDL을 실행할 때는 <code>SET lock_timeout = '3s'</code>처럼 잠금 대기 시간을 짧게 걸어요. 잠금을 못 얻으면 빨리 포기하고 물러나서 줄이 풀리고, 잠시 뒤 다시 시도하면 돼요.</p>
+
+      <div class="backend"><b>백엔드에서는</b> PostgreSQL의 <b>DDL은 트랜잭션 안에서 실행되고 롤백도 돼요.</b> MySQL과 크게 다른 점이에요. 마이그레이션 여러 단계를 하나의 트랜잭션으로 묶으면 중간에 실패해도 반쯤 적용된 상태가 남지 않아요. 단, 트랜잭션 안의 DDL이 잡은 강한 잠금은 커밋할 때까지 유지되니, 긴 작업과 함께 묶지 마세요.</div>
+
+      <div class="senior"><b>시니어 심화</b> 운영 중인 큰 테이블의 스키마를 바꿀 때는 <b>잠금이 짧은 단계로 쪼개는</b> 규칙을 팀에 둬요. 제약을 추가할 때는 "검증 없이 추가(<code>NOT VALID</code>)"와 "따로 검증(<code>VALIDATE CONSTRAINT</code>)"으로 나눠요. 앞은 순식간에 끝나고, 뒤의 검증은 약한 잠금으로 돌아서 쓰기를 막지 않아요. 인덱스는 동시 생성으로 만들고, 컬럼 타입 변경처럼 테이블을 다시 써야 하는 작업은 새 컬럼 추가와 점진적 복사로 대신해요.
+        <p>잠금 문제를 진단할 때는 <code>pg_stat_activity</code>의 <code>wait_event</code>와 <code>pg_blocking_pids(pid)</code>로 누가 누구를 막고 있는지 봐요. <code>log_lock_waits</code>를 켜면 일정 시간 넘게 기다린 잠금이 로그에 남아요. 배치 중복 실행 방지 같은 용도에는 <b>권고 잠금</b>(advisory lock)이 있어요. 애플리케이션이 정한 숫자 키로 거는 잠금이라 DB만으로 간단한 분산 락을 만들 수 있어요. 다만 세션 수준 권고 잠금은 1장의 풀러를 트랜잭션 모드로 쓰면 다른 세션으로 넘어가 버리니, 트랜잭션 수준 잠금(<code>pg_advisory_xact_lock</code>)을 써요.</p></div>
 
       <div class="summary"><span class="label">핵심 정리</span>
-        <ul><li>기본 격리 수준이 READ COMMITTED. RR은 갱신 충돌 시 에러(재시도 필요)</li><li>SERIALIZABLE = SSI. 쓰기 스큐까지 방지, 재시도 필수</li><li>DDL은 잠금 대기열로 테이블을 멈출 수 있음. lock_timeout 설정</li></ul>
+        <ul><li>기본 격리 수준이 READ COMMITTED. REPEATABLE READ는 갱신 충돌 시 에러(재시도 필요), 갭 락 없음</li><li>SERIALIZABLE = 관계 추적으로 쓰기 왜곡까지 방지, 재시도 필수</li><li>DDL은 잠금 대기열로 테이블을 멈출 수 있음. lock_timeout을 짧게</li></ul>
       </div>
       <div class="check"><span class="label">셀프 체크</span>
-        <ol><li>잠금을 아주 짧게만 잡는 ALTER TABLE이 서비스를 수 분간 멈출 수 있는 이유를 설명하세요.</li></ol>
+        <ol><li>잠금을 아주 짧게만 잡는 ALTER TABLE이 서비스를 몇 분간 멈출 수 있는 이유를 설명하세요.</li></ol>
         <details class="answer"><summary>답 보기</summary><div class="a">
-          <p>ALTER TABLE은 테이블에 대한 가장 강한 잠금이 필요해서, 그 테이블을 쓰고 있는 다른 트랜잭션이 모두 끝날 때까지 기다려요. 긴 조회나 열려 있는 트랜잭션이 하나라도 있으면 ALTER는 대기 상태가 돼요. 문제는 그 뒤에 도착하는 쿼리들이에요. 잠금 요청은 순서대로 처리되므로 새로 온 쿼리들은 단순한 SELECT라도 대기 중인 ALTER의 뒤에 줄을 서요. 결과적으로 그 긴 조회가 끝날 때까지 테이블에 대한 모든 쿼리가 멈춰요. 잠금 대기 시간 제한을 짧게 걸어 두면 ALTER가 빨리 포기하고 물러나서 대기열이 풀려요.</p>
+          <p>ALTER TABLE은 테이블에 대한 가장 강한 잠금이 필요해서, 그 테이블을 쓰고 있는 다른 트랜잭션이 모두 끝날 때까지 기다려요. 긴 조회나 열려 있는 트랜잭션이 하나라도 있으면 ALTER는 대기 상태가 돼요. 문제는 그 뒤에 도착하는 쿼리들이에요. 잠금 요청은 순서대로 처리되므로 새로 온 쿼리들은 단순한 SELECT라도 대기 중인 ALTER 뒤에 줄을 서요. 결국 그 긴 조회가 끝날 때까지 테이블에 대한 모든 쿼리가 멈춰요. 잠금 대기 시간을 짧게 걸어 두면 ALTER가 빨리 포기하고 물러나서 줄이 풀려요.</p>
         </div></details>
       </div>
       <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
@@ -290,43 +266,39 @@
 
     <section id="pg06" data-sec data-level="senior">
       <h2>6장 WAL과 복제</h2>
-      <p class="lead">물리 복제와 논리 복제</p>
+      <p class="lead">물리 복제, 논리 복제, 그리고 디스크를 채우는 슬롯</p>
 
-      <h3>WAL</h3>
-      <p>모든 변경은 데이터 파일에 반영되기 전에 WAL(Write-Ahead Log)에 먼저 기록돼요. 커밋은 WAL이 디스크에 내려가면 완료예요. 장애 후에는 마지막 체크포인트부터 WAL을 다시 적용해 복구해요. 원리는 InnoDB의 리두 로그와 같아요.</p>
-      <ul>
-        <li><b>체크포인트</b>: 더티 페이지를 디스크에 내려쓰고 "여기까지는 복구에 WAL이 필요 없다"를 표시해요.</li>
-        <li><b>전체 페이지 기록</b>: 체크포인트 후 어떤 페이지를 처음 고칠 때는 페이지 전체를 WAL에 기록해요. 쓰다 만 페이지로부터 복구하기 위한 것이고, 체크포인트 직후 WAL 양이 급증하는 이유예요.</li>
-      </ul>
-      <h3>스트리밍 복제(물리 복제)</h3>
-      <p>주 서버의 WAL을 복제본으로 계속 보내고, 복제본이 그것을 그대로 재생해요. 복제본은 주 서버와 <b>바이트 단위로 같은</b> 사본이에요.</p>
-      <ul>
-        <li>복제본은 읽기 전용 쿼리를 받을 수 있어요.</li>
-        <li>일부 테이블만 복제하거나 다른 버전 간에 복제할 수는 없어요.</li>
-        <li><code>synchronous_commit</code>과 <code>synchronous_standby_names</code>로 "복제본이 어디까지 받았을 때 커밋을 완료로 볼지"를 정해요.</li>
-      </ul>
+      <h3>문제: 쓰지도 않는 데이터로 디스크가 가득 찼다</h3>
+      <p>정산 데이터를 데이터 웨어하우스로 보내려고 변경 데이터 캡처(CDC) 커넥터를 붙였다가, 한 달 뒤 다른 방식으로 바꾸면서 커넥터를 내렸어요. 다시 한 달 뒤, 운영 DB의 디스크가 가득 차서 쓰기가 전부 멈췄어요. 데이터는 거의 늘지 않았는데, <code>pg_wal</code> 디렉터리가 수백 GB였어요.</p>
+
+      <h3>WAL: 먼저 로그에 쓴다</h3>
+      <p>모든 변경은 데이터 파일에 반영되기 전에 <b>WAL</b>(Write-Ahead Log)에 먼저 기록돼요. 커밋은 WAL이 디스크에 내려가면 끝나요. 장애가 나면 마지막 체크포인트부터 WAL을 다시 적용해 복구해요. 원리는 InnoDB의 리두 로그와 같아요(운영체제 챕터 42장). 체크포인트가 끝난 뒤 어떤 페이지를 처음 고칠 때는 페이지 전체를 WAL에 기록해요(쓰다 만 페이지로부터 복구하기 위해서예요). 그래서 체크포인트 직후에는 WAL 양이 확 늘어요.</p>
+
+      <h3>물리 복제: WAL을 그대로 재생한다</h3>
+      <p><b>스트리밍 복제</b>는 주 서버의 WAL을 복제본으로 계속 보내고, 복제본이 그것을 그대로 재생해요. 복제본은 주 서버와 <b>바이트 단위로 같은</b> 사본이에요. 읽기 전용 쿼리를 받을 수 있지만, 일부 테이블만 복제하거나 버전이 다른 서버 사이에는 복제할 수 없어요. <code>synchronous_commit</code>과 <code>synchronous_standby_names</code>로 "복제본이 어디까지 받았을 때 커밋을 끝난 것으로 볼지"를 정해요.</p>
+
+      <h3>논리 복제: 행의 변경으로 해석해서 보낸다</h3>
+      <p><b>논리 복제</b>는 WAL을 "어느 테이블의 어느 행이 어떻게 바뀌었다"로 해석해서 보내요. 테이블을 골라 복제할 수 있고, 버전이 다른 서버 사이에도 돼요(무중단 메이저 버전 업그레이드에 써요). 변경을 Kafka 같은 곳으로 흘려보내는 <b>CDC의 바탕</b>이기도 해요. 스키마 변경(DDL)은 복제되지 않으니 양쪽에 따로 적용해야 해요.</p>
+
+      <h3>복제 슬롯: 아직 안 받아 간 것은 지우지 않는다</h3>
+      <figure class="diagram">
+              <svg width="620" viewBox="0 0 620 200" role="img" aria-label="복제 슬롯은 소비자가 받아 가기 전까지 WAL을 지우지 않는다. 소비자가 사라지면 WAL이 끝없이 쌓인다"><rect x="16" y="66" width="150" height="52" rx="8" class="dg-acc"/><text x="91" y="89" text-anchor="middle" class="dg-tb">주 서버</text><text x="91" y="105" text-anchor="middle" class="dg-tm">WAL 생성</text><rect x="260" y="10" width="160" height="52" rx="8" class="dg-box"/><text x="340" y="33" text-anchor="middle" class="dg-tb">스트리밍 복제본</text><text x="340" y="49" text-anchor="middle" class="dg-tm">WAL 그대로 재생</text><rect x="260" y="120" width="160" height="52" rx="8" class="dg-soft"/><text x="340" y="143" text-anchor="middle" class="dg-tb">논리 복제 슬롯</text><text x="340" y="159" text-anchor="middle" class="dg-tm">"여기까지 받아 감"</text><rect x="470" y="120" width="134" height="52" rx="8" class="dg-none"/><text x="537" y="143" text-anchor="middle" class="dg-tb">CDC 커넥터</text><text x="537" y="159" text-anchor="middle" class="dg-tm">내렸음</text><path d="M168 74.7 L256.1 54.9" class="dg-la"/><path d="M168 108.7 L256.1 127.8" class="dg-la"/><path d="M422 146 L466 146" class="dg-lm dg-ld"/><text x="340" y="194" text-anchor="middle" class="dg-tw">pg_wal: 안 받아 간 WAL이 계속 쌓임</text></svg>
+              <figcaption>복제 슬롯은 소비자가 받아 가기 전까지 WAL을 지우지 않는다. 소비자가 사라지면 WAL이 끝없이 쌓인다</figcaption>
+            </figure>
+      <p>소비자가 잠깐 끊겨도 이어서 받을 수 있도록, 주 서버는 <b>복제 슬롯</b>에 "이 소비자는 어디까지 받았다"를 기억하고, <b>아직 안 받아 간 WAL은 지우지 않아요.</b> 문제의 원인이 이것이에요. 커넥터를 내렸지만 슬롯은 지우지 않았고, 주 서버는 "언젠가 돌아올 소비자"를 위해 두 달 치 WAL을 전부 붙잡고 있었어요. 슬롯은 3장의 VACUUM도 막을 수 있어서 테이블 팽창까지 함께 일으켜요.</p>
+
       <h3>복제본에서의 쿼리 충돌</h3>
-      <p>복제본에서 긴 쿼리가 옛 튜플을 읽는 중인데, 주 서버에서 VACUUM이 그 튜플을 지운 WAL이 도착하면 충돌이에요. 복제본은 WAL 적용을 미루다가(복제 지연 증가) 한도를 넘으면 <b>쿼리를 취소</b>해요.</p>
-      <p><code>hot_standby_feedback</code>을 켜면 복제본이 "나는 아직 이 튜플이 필요하다"를 주 서버에 알려 VACUUM이 미루게 해요. 대신 복제본의 긴 쿼리가 <b>주 서버의 팽창</b>을 만들어요.</p>
-      <h3>논리 복제</h3>
-      <p>WAL을 "어느 테이블의 어느 행이 어떻게 바뀌었다"는 논리적 변경으로 해석해서 보내요.</p>
-      <ul>
-        <li>테이블 단위로 골라 복제할 수 있고, 버전이 다른 서버 사이에도 돼요. 무중단 메이저 버전 업그레이드에 써요.</li>
-        <li>변경 데이터 캡처(CDC)의 기반이에요. 변경을 Kafka 같은 곳으로 흘려보내요.</li>
-        <li>스키마 변경(DDL)은 복제되지 않아요. 양쪽에 따로 적용해야 해요.</li>
-      </ul>
-      <h3>복제 슬롯</h3>
-      <p>소비자가 어디까지 받았는지 주 서버가 기억하고, <b>아직 안 받은 WAL을 지우지 않게</b> 해요. 소비자가 잠깐 끊겨도 이어받을 수 있어요. 위험은 소비자가 영영 돌아오지 않을 때예요. WAL이 끝없이 쌓여 <b>디스크가 가득 차고 주 서버가 멈춰요.</b></p>
+      <p>복제본에서 긴 정산 리포트가 옛 튜플을 읽는 중인데, 주 서버의 VACUUM이 그 튜플을 지웠다는 WAL이 도착하면 충돌이에요. 복제본은 WAL 적용을 미루다가(복제 지연이 늘어요) 한도를 넘으면 <b>그 쿼리를 취소</b>해요. <code>hot_standby_feedback</code>을 켜면 복제본이 "이 튜플은 아직 필요하다"를 주 서버에 알려 VACUUM이 기다리게 하는데, 그러면 복제본의 긴 쿼리가 <b>주 서버의 팽창</b>을 만들어요. 긴 분석 쿼리는 운영 복제본이 아니라 따로 둔 분석용 복제본이나 웨어하우스로 보내요.</p>
 
-      <div class="backend"><b>백엔드에서는</b> 복제 슬롯을 만들었다면 슬롯별로 밀린 WAL 양을 모니터링하고, 한도를 넘으면 슬롯을 무효화하는 설정(<code>max_slot_wal_keep_size</code>)을 거세요. CDC 커넥터를 내렸는데 슬롯을 지우지 않아 운영 DB 디스크가 차는 사고가 흔해요. PostgreSQL에는 자동 장애 조치가 내장돼 있지 않아서 별도 도구(Patroni 등)나 관리형 서비스가 맡아요.</div>
+      <div class="backend"><b>백엔드에서는</b> 복제 슬롯을 만들었다면 슬롯별로 밀린 WAL 양을 모니터링하고(<code>pg_replication_slots</code>), 슬롯이 붙잡을 수 있는 WAL의 최대 크기(<code>max_slot_wal_keep_size</code>)를 설정해 한도를 넘으면 슬롯이 무효가 되게 하세요. CDC 커넥터를 내릴 때는 슬롯 삭제를 절차에 반드시 넣으세요. 그리고 PostgreSQL에는 자동 장애 조치가 내장돼 있지 않아요. 별도 도구(Patroni 등)나 관리형 서비스가 맡아요.</div>
 
       <div class="summary"><span class="label">핵심 정리</span>
-        <ul><li>WAL 먼저, 커밋 = WAL 동기화. 체크포인트 후 전체 페이지 기록으로 WAL 급증</li><li>물리 복제 = 바이트 단위 사본, 논리 복제 = 행 변경 단위(CDC, 버전 간 이전)</li><li>복제 슬롯은 WAL을 붙잡음. 방치하면 디스크가 참</li></ul>
+        <ul><li>WAL 먼저, 커밋 = WAL 동기화. 체크포인트 직후 전체 페이지 기록으로 WAL 급증</li><li>물리 복제 = 바이트 단위 사본, 논리 복제 = 행 변경 단위(CDC, 버전 간 이전)</li><li>복제 슬롯은 WAL을 붙잡음. 방치하면 디스크가 차고 VACUUM도 막힘</li></ul>
       </div>
       <div class="check"><span class="label">셀프 체크</span>
         <ol><li>사용하지 않게 된 논리 복제 슬롯을 지우지 않으면 어떤 일이 일어나나요?</li></ol>
         <details class="answer"><summary>답 보기</summary><div class="a">
-          <p>복제 슬롯은 소비자가 아직 받아 가지 않은 WAL을 주 서버가 지우지 못하게 해요. 소비자가 사라졌는데 슬롯이 남아 있으면 그 시점 이후의 WAL이 전부 보존되어 계속 쌓여요. 결국 디스크가 가득 차고, WAL을 쓸 수 없게 된 주 서버는 쓰기를 처리하지 못하고 멈춰요. 슬롯은 죽은 튜플 정리도 붙잡을 수 있어서 테이블 팽창까지 일으켜요. 안 쓰는 슬롯은 즉시 삭제하고, 슬롯이 붙잡을 수 있는 WAL의 최대 크기를 설정해 한도를 넘으면 슬롯이 무효화되게 해 둬야 해요.</p>
+          <p>복제 슬롯은 소비자가 아직 받아 가지 않은 WAL을 주 서버가 지우지 못하게 해요. 소비자가 사라졌는데 슬롯이 남아 있으면 그 시점 이후의 WAL이 전부 보존되어 계속 쌓여요. 결국 디스크가 가득 차고, WAL을 쓸 수 없게 된 주 서버는 쓰기를 처리하지 못하고 멈춰요. 슬롯은 죽은 튜플 정리도 붙잡을 수 있어서 테이블 팽창까지 일으켜요. 안 쓰는 슬롯은 바로 지우고, 슬롯이 붙잡을 수 있는 WAL의 최대 크기를 설정해 한도를 넘으면 슬롯이 무효가 되게 해 둬야 해요.</p>
         </div></details>
       </div>
       <label class="done"><input type="checkbox"> 이 장 학습 완료</label>
@@ -340,12 +312,12 @@
       <p class="lead">컨테이너로 PostgreSQL을 띄우고 직접 관찰하세요.</p>
       <ul class="lab">
         <li><b>1장</b> 연결을 수백 개 열고 서버의 프로세스 수와 메모리 확인. PgBouncer를 앞에 두고 실제 DB 연결 수 비교</li>
-        <li><b>2장</b> <code>SELECT xmin, xmax, ctid, *</code>로 행을 본 뒤 UPDATE하고 다시 조회해 값이 어떻게 바뀌는지 확인</li>
-        <li><b>3장</b> 한 세션에서 트랜잭션을 열어 둔 채, 다른 세션에서 대량 UPDATE 후 VACUUM VERBOSE를 실행해 회수되지 않는 것을 확인</li>
-        <li><b>3장</b> 같은 행을 반복 갱신하며 테이블 크기 변화 관찰. autovacuum을 끈 경우와 비교</li>
-        <li><b>4장</b> JSONB 컬럼에 GIN 인덱스를, 상태 컬럼에 부분 인덱스를 만들고 EXPLAIN ANALYZE로 전후 비교</li>
-        <li><b>5장</b> REPEATABLE READ에서 두 세션이 같은 행을 갱신해 직렬화 실패 에러 재현. 긴 SELECT + ALTER TABLE로 잠금 대기열 재현</li>
-        <li><b>6장</b> 스트리밍 복제본을 구성하고 복제 지연 확인. 논리 복제 슬롯을 만들고 소비하지 않은 채 쓰기를 계속해 WAL이 쌓이는 것을 관찰</li>
+        <li><b>2장</b> <code>SELECT xmin, xmax, ctid, *</code>로 행을 본 뒤 UPDATE하고 다시 조회해 값과 위치가 어떻게 바뀌는지 확인</li>
+        <li><b>3장</b> 한 세션에서 트랜잭션을 열어 둔 채 다른 세션에서 대량 UPDATE 후 <code>VACUUM VERBOSE</code>를 실행해 치우지 못하는 것 확인</li>
+        <li><b>3장</b> 같은 행을 반복 갱신하며 테이블 크기 변화 관찰. fillfactor를 낮췄을 때 HOT 갱신 비율 비교</li>
+        <li><b>4장</b> 3백만 행 테이블에서 1%만 해당하는 조건으로 일반 인덱스와 부분 인덱스를 만들어 크기와 <code>EXPLAIN ANALYZE</code> 비교</li>
+        <li><b>5장</b> REPEATABLE READ에서 두 세션이 같은 행을 갱신해 직렬화 에러 재현. 긴 SELECT + ALTER TABLE로 잠금 대기열을 재현하고 <code>lock_timeout</code>으로 해결</li>
+        <li><b>6장</b> 논리 복제 슬롯을 만들고 소비하지 않은 채 쓰기를 계속해 <code>pg_wal</code>이 커지는 것 관찰. 슬롯을 지우고 줄어드는 것 확인</li>
       </ul>
       <label class="done"><input type="checkbox"> 실습 완료</label>
     </section>
