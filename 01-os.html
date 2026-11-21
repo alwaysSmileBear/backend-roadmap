@@ -378,7 +378,7 @@
         </ol>
         <h4>해결책</h4>
         <ul>
-          <li><b>런타임이 한도를 알게 해요.</b> JDK 10 이상(8u191 이상)은 cgroup의 CPU 한도를 인식해서 그에 맞게 스레드 수를 정해요. 확인하려면 컨테이너 안에서 <code>Runtime.getRuntime().availableProcessors()</code>가 2를 돌려주는지 봐요. 필요하면 <code>-XX:ActiveProcessorCount=2</code>로 직접 지정해요. Go는 오랫동안 호스트 코어 수를 써서 <code>automaxprocs</code> 같은 라이브러리로 맞췄어요(최근 버전은 컨테이너 한도를 반영해요). 런타임마다 확인이 필요해요.</li>
+          <li><b>런타임이 한도를 알게 해요.</b> JDK 10 이상(8u191 이상)은 cgroup의 CPU 한도를 인식해서 그에 맞게 스레드 수를 정해요. 확인하려면 컨테이너 안에서 <code>Runtime.getRuntime().availableProcessors()</code>가 2를 돌려주는지 봐요. 필요하면 <code>-XX:ActiveProcessorCount=2</code>로 직접 지정해요. Go는 오랫동안 호스트 코어 수를 써서 <code>automaxprocs</code> 같은 라이브러리로 맞췄어요(Go 1.25부터는 기본으로 컨테이너의 CPU 한도를 반영해요). 런타임마다 확인이 필요해요.</li>
           <li><b>스레드 수를 명시해요.</b> GC 스레드(<code>-XX:ParallelGCThreads</code>, <code>-XX:ConcGCThreads</code>)와 애플리케이션 스레드풀 크기를 한도에 맞게 직접 정해요.</li>
           <li><b>지연에 민감한 서비스는 limit을 빼는 방법도 있어요.</b> CPU request만 정확히 두고 limit을 걸지 않으면 스로틀링 자체가 없어요. 대신 같은 노드의 다른 파드와 남는 CPU를 나눠 쓰게 되니, request를 실제 사용량에 맞게 잡는 것이 중요해요(쿠버네티스 챕터 5장).</li>
         </ul>
