@@ -79,14 +79,14 @@
         <p>주문 이벤트 토픽은 주문 ID를 키로 써서, 한 주문의 이벤트(생성, 결제, 취소)가 순서대로 처리되게 했어요. 세일을 앞두고 처리량을 늘리려고 파티션을 4개에서 6개로 늘렸어요. 그날 "취소된 주문이 결제 완료 상태로 남았다"는 문의가 수십 건 들어왔어요.</p>
         <h4>깨지는 과정</h4>
         <figure class="diagram">
-        <svg width="704" viewBox="0 0 704 92" role="img" aria-label="파티션 수가 바뀌면 같은 키가 다른 파티션으로 간다. 두 파티션 사이에는 순서가 없다"><rect x="12" y="26" width="92" height="52" rx="8" class="dg-box"/><text x="58" y="49" text-anchor="middle" class="dg-tb">주문 1001</text><text x="58" y="65" text-anchor="middle" class="dg-tm">해시 값 같음</text><path d="M106 52 L162 52" class="dg-l"/><text x="134.5" y="44" text-anchor="middle" class="dg-tm">해시 % 4</text><rect x="165" y="26" width="121" height="52" rx="8" class="dg-box"/><text x="225.5" y="49" text-anchor="middle" class="dg-tb">파티션 4개일 때</text><text x="225.5" y="65" text-anchor="middle" class="dg-tm">나머지 0: P0</text><path d="M288 52 L327 52" class="dg-l"/><text x="308" y="44" text-anchor="middle" class="dg-tm">증설</text><rect x="330" y="26" width="134" height="52" rx="8" class="dg-warn"/><text x="397" y="56" text-anchor="middle" class="dg-tb">파티션 6개로 늘림</text><path d="M466 52 L522 52" class="dg-l"/><text x="494.5" y="44" text-anchor="middle" class="dg-tm">해시 % 6</text><rect x="525" y="26" width="167" height="52" rx="8" class="dg-warn"/><text x="608.5" y="49" text-anchor="middle" class="dg-tb">나머지 3: P3</text><text x="608.5" y="65" text-anchor="middle" class="dg-tm">P0의 옛 이벤트와 순서 없음</text></svg>
+        <svg width="704" viewBox="0 0 704 92" role="img" aria-label="파티션 수가 바뀌면 같은 키가 다른 파티션으로 간다. 두 파티션 사이에는 순서가 없다"><rect x="12" y="26" width="92" height="52" rx="8" class="dg-box"/><text x="58" y="49" text-anchor="middle" class="dg-tb">주문 1001</text><text x="58" y="65" text-anchor="middle" class="dg-tm">해시 값 같음</text><path d="M106 52 L162 52" class="dg-l"/><text x="134.5" y="44" text-anchor="middle" class="dg-tm">해시 % 4</text><rect x="165" y="26" width="121" height="52" rx="8" class="dg-box"/><text x="225.5" y="49" text-anchor="middle" class="dg-tb">파티션 4개일 때</text><text x="225.5" y="65" text-anchor="middle" class="dg-tm">나머지 0: P0</text><path d="M288 52 L327 52" class="dg-l"/><text x="308" y="44" text-anchor="middle" class="dg-tm">증설</text><rect x="330" y="26" width="134" height="52" rx="8" class="dg-warn"/><text x="397" y="56" text-anchor="middle" class="dg-tb">파티션 6개로 늘림</text><path d="M466 52 L522 52" class="dg-l"/><text x="494.5" y="44" text-anchor="middle" class="dg-tm">해시 % 6</text><rect x="525" y="26" width="167" height="52" rx="8" class="dg-warn"/><text x="608.5" y="49" text-anchor="middle" class="dg-tb">나머지 4: P4</text><text x="608.5" y="65" text-anchor="middle" class="dg-tm">P0의 옛 이벤트와 순서 없음</text></svg>
         <figcaption>파티션 수가 바뀌면 같은 키가 다른 파티션으로 간다. 두 파티션 사이에는 순서가 없다</figcaption>
       </figure>
         <ol>
           <li>주문 1001의 해시를 4로 나눈 나머지가 0이라서, 어제까지 그 주문의 이벤트는 P0에 쌓였어요.</li>
-          <li>파티션을 6개로 늘린 순간부터 같은 해시를 6으로 나누니 나머지가 3이 돼요. 주문 1001의 새 이벤트는 P3에 쌓여요.</li>
-          <li>늘리기 직전에 P0에 쓴 "결제 완료"와 늘린 직후 P3에 쓴 "주문 취소"는 서로 다른 파티션에 있어요. 파티션 사이에는 순서가 없어요.</li>
-          <li>P0의 컨슈머가 밀려 있었다면 P3의 "취소"가 먼저 처리되고, 뒤늦게 "결제 완료"가 처리돼서 최종 상태가 결제 완료로 남아요.</li>
+          <li>파티션을 6개로 늘린 순간부터 같은 해시를 6으로 나누니 나머지가 4가 돼요. 주문 1001의 새 이벤트는 P4에 쌓여요.</li>
+          <li>늘리기 직전에 P0에 쓴 "결제 완료"와 늘린 직후 P4에 쓴 "주문 취소"는 서로 다른 파티션에 있어요. 파티션 사이에는 순서가 없어요.</li>
+          <li>P0의 컨슈머가 밀려 있었다면 P4의 "취소"가 먼저 처리되고, 뒤늦게 "결제 완료"가 처리돼서 최종 상태가 결제 완료로 남아요.</li>
         </ol>
         <h4>해결책</h4>
         <ul>

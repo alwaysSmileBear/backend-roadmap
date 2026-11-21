@@ -1204,7 +1204,7 @@ WHERE salary >= 50000000 / 12</code></pre>
       <p class="lead">문자열, 숫자, 날짜, JSON — 타입 선택이 저장 공간과 인덱스와 버그를 결정한다</p>
 
       <h3>문자열: CHAR vs VARCHAR</h3>
-      <p>CHAR(10)은 항상 10문자 공간(utf8mb4면 40바이트 예약), VARCHAR는 실제 길이 + 길이 바이트(1~2). 길이가 거의 고정이고 자주 바뀌면 CHAR(변경 시 페이지 내 이동 없음), 아니면 VARCHAR. VARCHAR(255)와 VARCHAR(20)은 저장은 같지만 <b>메모리 정렬·임시 테이블에서는 선언 길이만큼 할당</b>해요. 필요한 만큼만 선언하세요. TEXT는 별도 페이지(off-page)에 저장될 수 있어 조회 비용이 커요.</p>
+      <p>CHAR(10)은 latin1 같은 1바이트 문자셋이면 항상 10바이트 고정이지만, utf8mb4에서는 InnoDB가 최소 10바이트~최대 40바이트의 가변 길이로 저장해요. VARCHAR는 실제 길이 + 길이 바이트(1~2). 고정 길이 코드값(1바이트 문자셋)이면 CHAR, 아니면 VARCHAR. VARCHAR(255)와 VARCHAR(20)은 저장은 같지만 <b>메모리 정렬·임시 테이블에서는 선언 길이만큼 할당</b>해요. 필요한 만큼만 선언하세요. TEXT는 별도 페이지(off-page)에 저장될 수 있어 조회 비용이 커요.</p>
 
       <h3>문자셋과 콜레이션</h3>
       <p>8.0 기본 <code>utf8mb4</code>(이모지 포함 4바이트). <code>utf8</code>(=utf8mb3)은 3바이트까지라 이모지 저장 시 에러. <b>콜레이션</b>은 비교·정렬 규칙: <code>utf8mb4_0900_ai_ci</code>(악센트·대소문자 무시, 기본), <code>utf8mb4_bin</code>(바이트 비교). 조인·비교하는 컬럼은 콜레이션이 같아야 인덱스를 써요. 대소문자 구분이 필요한 값(토큰, base64)은 bin.</p>
@@ -1218,7 +1218,7 @@ WHERE salary >= 50000000 / 12</code></pre>
 
       <h3>날짜와 시간</h3>
       <ul>
-        <li><b>DATETIME</b>: 8바이트(8.0은 5+소수), 타임존 없이 입력 그대로 저장. 1000~9999년.</li>
+        <li><b>DATETIME</b>: 5바이트 + 소수초(MySQL 5.6.4 이전은 8바이트), 타임존 없이 입력 그대로 저장. 1000~9999년.</li>
         <li><b>TIMESTAMP</b>: 4바이트, UTC로 저장하고 세션 타임존으로 변환해서 보여줌. <b>2038년 1월까지</b>. 타임존 변환이 자동이라 편하지만 커넥션 타임존 설정에 따라 값이 달라 보여서 혼란의 원인.</li>
         <li>권장: 서버와 커넥션 타임존을 UTC로 통일하고 DATETIME에 UTC 저장, 표시 시 애플리케이션에서 변환. JDBC <code>serverTimezone</code>/<code>connectionTimeZone</code> 확인.</li>
         <li><code>DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP</code>로 created_at/updated_at 자동화.</li>
