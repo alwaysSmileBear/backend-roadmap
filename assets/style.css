@@ -268,6 +268,8 @@ section.done label.done { color: var(--done); }
 }
 .senior > b:first-child { color: var(--senior); }
 .senior ul { margin: 4px 0 0; }
+.senior h4 { color: var(--senior); font-size: 13.5px; margin: 16px 0 4px; }
+.senior figure.diagram { margin: 10px 0; }
 section[data-level="senior"] > h2::after, #toc .lv {
   content: "시니어"; display: inline-block; flex-shrink: 0;
   font-size: 11px; font-weight: 600; line-height: 1.6;
