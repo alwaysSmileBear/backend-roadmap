@@ -330,7 +330,7 @@
           <li><b>긴 쿼리를 막아요.</b> 서비스 DB에서 긴 리포트 쿼리를 돌리지 않고 복제본으로 보내요. <code>statement_timeout</code>으로 쿼리 시간에도 상한을 둬요.</li>
         </ul>
         <h4>배치 중복 실행 방지에는 권고 잠금</h4>
-        <p>여러 서버 중 한 곳에서만 배치가 돌게 하고 싶을 때, PostgreSQL의 <b>권고 잠금</b>(advisory lock)을 쓰면 DB만으로 간단한 분산 락을 만들 수 있어요. 애플리케이션이 정한 숫자 키로 거는 잠금이에요. 다만 세션 수준 권고 잠금은 PgBouncer를 트랜잭션 모드로 쓰면 다른 세션으로 넘어가 버려서 의미가 없어져요. 트랜잭션 수준 잠금(<code>pg_try_advisory_xact_lock</code>)을 쓰고, 트랜잭션이 끝나면 자동으로 풀리게 해요.</p>
+        <p>여러 서버 중 한 곳에서만 배치가 돌게 하고 싶을 때, PostgreSQL의 <b>권고 잠금</b>(advisory lock)을 쓰면 DB만으로 간단한 분산 락을 만들 수 있어요. 애플리케이션이 정한 숫자 키로 거는 잠금이에요. 다만 세션 수준 권고 잠금은 PgBouncer를 트랜잭션 모드로 쓰면 다른 세션으로 넘어가 버려서 의미가 없어져요. 트랜잭션 수준 잠금(<code>pg_try_advisory_xact_lock</code>)을 쓰고, 트랜잭션이 끝나면 자동으로 풀리게 해요. 다만 그러면 배치가 끝날 때까지 트랜잭션을 열어 둬야 해서, 1장 시니어의 <code>idle_in_transaction_session_timeout</code>에 걸리거나 긴 트랜잭션이 될 수 있어요. 배치가 길다면 잠금용 연결만 PgBouncer를 거치지 않고 DB에 직접 붙여서 세션 수준 잠금을 쓰는 편이 나아요.</p>
         <h4>운영에서 알아채는 법</h4>
         <ul>
           <li><code>pg_stat_activity</code>의 <code>wait_event_type = 'Lock'</code>인 세션 수를 지표로 남겨요. 갑자기 늘면 <code>pg_blocking_pids(pid)</code>로 누가 막고 있는지 바로 찾아요.</li>
