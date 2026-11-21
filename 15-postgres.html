@@ -120,7 +120,7 @@
       <p>정산 서비스에는 판매자별 "오늘 정산 예정 금액"을 담은 테이블이 있어요. 주문이 들어올 때마다 해당 판매자의 행을 UPDATE해요. 행 수는 판매자 수만큼, 5만 개로 일정한데, 테이블 파일 크기는 며칠 만에 처음의 두 배가 됐어요. 행이 늘지 않았는데 왜 커졌을까요?</p>
 
       <h3>옛 버전을 어디에 두는가</h3>
-      <p>MySQL과 PostgreSQL은 둘 다 MVCC로 "읽기가 쓰기를 막지 않게" 해요(데이터베이스 챕터 4장). 어떤 트랜잭션이 행을 고치는 동안에도 다른 트랜잭션은 고치기 전의 값을 읽을 수 있어야 해요. 그러려면 옛 버전을 어딘가에 둬야 하는데, 두는 곳이 달라요.</p>
+      <p>MySQL과 PostgreSQL은 둘 다 MVCC로 "읽기가 쓰기를 막지 않게" 해요(데이터베이스 챕터 4.2). 어떤 트랜잭션이 행을 고치는 동안에도 다른 트랜잭션은 고치기 전의 값을 읽을 수 있어야 해요. 그러려면 옛 버전을 어딘가에 둬야 하는데, 두는 곳이 달라요.</p>
       <p><b>InnoDB</b>는 행을 제자리에서 고치고, 옛 버전은 별도의 <b>언두 로그</b>에 둬요. <b>PostgreSQL</b>은 옛 행을 그대로 두고 <b>새 행을 테이블 안에 추가</b>해요. 옛 버전과 새 버전이 같은 테이블에 나란히 있어요. PostgreSQL에서는 행의 버전 하나하나를 <b>튜플</b>이라고 불러요.</p>
 
       <h3>튜플마다 붙은 두 숫자</h3>
@@ -191,7 +191,7 @@
               <svg width="671" viewBox="0 0 671 92" role="img" aria-label="오래 열린 트랜잭션 하나가 그 이후의 모든 정리를 막는다"><rect x="12" y="26" width="147" height="52" rx="8" class="dg-warn"/><text x="85.5" y="49" text-anchor="middle" class="dg-tb">3일째 열린 트랜잭션</text><text x="85.5" y="65" text-anchor="middle" class="dg-tm">정산 배치 서버</text><path d="M161 52 L200 52" class="dg-l"/><rect x="203" y="26" width="142" height="52" rx="8" class="dg-soft"/><text x="274" y="49" text-anchor="middle" class="dg-tb">VACUUM</text><text x="274" y="65" text-anchor="middle" class="dg-tm">그 이후 튜플은 못 치움</text><path d="M347 52 L386 52" class="dg-l"/><rect x="389" y="26" width="113" height="52" rx="8" class="dg-box"/><text x="445.5" y="56" text-anchor="middle" class="dg-tb">죽은 튜플 누적</text><path d="M504 52 L543 52" class="dg-l"/><rect x="546" y="26" width="113" height="52" rx="8" class="dg-warn"/><text x="602.5" y="49" text-anchor="middle" class="dg-tb">팽창</text><text x="602.5" y="65" text-anchor="middle" class="dg-tm">모든 쿼리 느려짐</text></svg>
               <figcaption>오래 열린 트랜잭션 하나가 그 이후의 모든 정리를 막는다</figcaption>
             </figure>
-      <p>위 문제는 autovacuum이 늦어서가 아니었어요. VACUUM은 <b>아직 누군가 볼 수 있는</b> 튜플은 치울 수 없어요. 어떤 트랜잭션이 3일 전에 시작해서 아직 끝나지 않았다면, 그 트랜잭션의 스냅샷으로 보면 3일 전 이후에 대체된 튜플은 전부 "아직 보일 수 있는" 튜플이에요. 정산 배치 서버 한 대가 트랜잭션을 연 채로 멈춰 있었던 거예요(1장의 <code>idle in transaction</code>).</p>
+      <p>위 문제는 autovacuum이 늦어서가 아니었어요. VACUUM은 <b>아직 누군가 볼 수 있는</b> 튜플은 치울 수 없어요. 어떤 트랜잭션이 3일 전에 시작해서 아직 끝나지 않았다면, 그 트랜잭션의 스냅샷으로 보면 3일 전 이후에 대체된 튜플은 전부 "아직 보일 수 있는" 튜플이에요. 정산 배치 서버 한 대가 트랜잭션을 연 채로 멈춰 있었던 거예요(1장 시니어 심화의 <code>idle in transaction</code>).</p>
       <p>VACUUM을 막는 것은 세 가지예요. <b>오래 열린 트랜잭션</b>, 소비자가 따라오지 못하는 <b>복제 슬롯</b>(6장), 커밋도 롤백도 안 된 <b>준비된 트랜잭션</b>(2단계 커밋). "autovacuum이 도는데 테이블이 계속 커진다"면 이 셋을 먼저 봐요.</p>
 
       <h3>팽창</h3>

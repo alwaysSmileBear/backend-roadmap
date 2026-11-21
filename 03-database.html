@@ -498,7 +498,7 @@ KILL &lt;id&gt;;                                          -- 문제 세션 종�
       <p>Phantom: 일반 SELECT는 스냅샷이라 새 행이 안 보여요. <code>SELECT ... FOR UPDATE</code>는 스냅샷이 아니라 현재 데이터를 잠금 읽기하는데, 넥스트 키 락으로 범위에 INSERT를 막아 phantom을 방지해요. 단, 일반 SELECT와 잠금 읽기를 섞으면 결과가 달라 보일 수 있어요.</p>
 
       <h3>READ COMMITTED를 쓰는 경우</h3>
-      <p>갭 락이 거의 안 걸려 INSERT 경합이 적고, 긴 트랜잭션의 언두 부담도 적어요. 대신 같은 트랜잭션 안에서 값이 바뀔 수 있어요. PostgreSQL 사용자는 이게 기본이라 익숙해요. MySQL에서 바꾸려면 바이너리 로그 포맷이 ROW여야 해요(16장).</p>
+      <p>갭 락이 거의 안 걸려 INSERT 경합이 적고, 긴 트랜잭션의 언두 부담도 적어요. 대신 같은 트랜잭션 안에서 값이 바뀔 수 있어요. PostgreSQL 사용자는 이게 기본이라 익숙해요. MySQL에서 바꾸려면 바이너리 로그 포맷이 ROW(또는 MIXED)여야 해요(16장).</p>
 
       <div class="backend"><b>백엔드에서는</b> "재고 확인 후 차감"에서 SELECT로 10개 확인 → UPDATE 하는 사이 다른 트랜잭션이 차감하면? REPEATABLE READ라도 SELECT는 스냅샷일 뿐 락이 아니라서 막지 못해요. 확인-갱신은 <code>FOR UPDATE</code>로 잠금 읽기하거나 원자적 UPDATE로 해야 해요. 격리 수준은 "읽기의 일관성"이지 "쓰기 경쟁 방지"가 아니에요. 그리고 JPA 영속성 컨텍스트(1차 캐시)는 DB 격리 수준과 별개로 같은 엔티티를 반복 읽기처럼 보이게 해요. 둘을 혼동하지 마세요.</div>
 
@@ -926,7 +926,7 @@ EXPLAIN ANALYZE SELECT ...;      -- 실제 실행하고 실측 시간·행 수 (
         <tr><td>select_type</td><td>SIMPLE, PRIMARY, SUBQUERY, DERIVED, DEPENDENT SUBQUERY, MATERIALIZED...</td><td><b>DEPENDENT SUBQUERY</b>는 외부 행마다 실행 → 느림</td></tr>
         <tr><td>table</td><td>테이블명 또는 &lt;derived2&gt;, &lt;subquery2&gt;</td><td></td></tr>
         <tr><td>partitions</td><td>접근한 파티션</td><td>파티션 프루닝 확인</td></tr>
-        <tr><td><b>type</b></td><td>접근 방식. 좋은 순: system > const > eq_ref > ref > fulltext > ref_or_null > range > index_merge > unique_subquery > index_subquery > <b>range</b> > <b>index</b> > <b>ALL</b></td><td>index = 인덱스 풀스캔, ALL = 테이블 풀스캔. 둘 다 큰 테이블이면 문제</td></tr>
+        <tr><td><b>type</b></td><td>접근 방식. 좋은 순: system > const > eq_ref > ref > fulltext > ref_or_null > unique_subquery > index_subquery > <b>range</b> > index_merge > <b>index</b> > <b>ALL</b></td><td>index = 인덱스 풀스캔, ALL = 테이블 풀스캔. 둘 다 큰 테이블이면 문제</td></tr>
         <tr><td>possible_keys</td><td>후보 인덱스</td><td>참고만</td></tr>
         <tr><td><b>key</b></td><td>실제 사용 인덱스</td><td>NULL이면 인덱스 없이</td></tr>
         <tr><td>key_len</td><td>사용한 인덱스 키 바이트 수</td><td>복합 인덱스 중 <b>몇 컬럼까지</b> 썼는지 추정. INT 4, VARCHAR(100) utf8mb4 = 402, NULL 가능 +1</td></tr>
@@ -1168,7 +1168,7 @@ WHERE salary >= 50000000 / 12</code></pre>
       <ul>
         <li><b>RANGE</b>: 값 범위. <code>PARTITION BY RANGE (YEAR(created_at))</code>. 로그·이력 테이블의 표준. 오래된 파티션을 <b>DROP PARTITION</b>으로 즉시 삭제.</li>
         <li><b>LIST</b>: 값 목록. 지역 코드별 등.</li>
-        <li><b>HASH / KEY</b>: 해시로 균등 분산. 특정 파티션만 읽는 효과는 PK 조회에서만.</li>
+        <li><b>HASH / KEY</b>: 해시로 균등 분산. 특정 파티션만 읽는 효과는 파티션 키의 등호 조회에서만(범위 조건은 전 파티션).</li>
       </ul>
 
       <h3>제약</h3>
@@ -1361,7 +1361,7 @@ WHERE salary >= 50000000 / 12</code></pre>
       <div class="tbl"><table>
         <tr><th>포맷</th><th>기록 내용</th><th>장점</th><th>단점</th></tr>
         <tr><td>STATEMENT</td><td>실행한 SQL 문</td><td>로그 작음</td><td>비결정적 함수(NOW(), UUID(), LIMIT 없는 ORDER BY)가 replica에서 다른 결과. RC 격리 수준 사용 불가</td></tr>
-        <tr><td><b>ROW</b></td><td>변경된 행의 전후 값</td><td>정확, 안전, RC 사용 가능. <b>8.0 기본</b></td><td>대량 UPDATE 시 로그 거대(100만 행 = 100만 이벤트)</td></tr>
+        <tr><td><b>ROW</b></td><td>변경된 행의 전후 값</td><td>정확, 안전, RC 사용 가능. <b>8.0 기본</b></td><td>대량 UPDATE 시 로그 거대(100만 행이면 100만 행의 전후 값이 전부 기록됨)</td></tr>
         <tr><td>MIXED</td><td>기본 STATEMENT, 위험하면 ROW</td><td>절충</td><td>판단 기준 복잡</td></tr>
       </table></div>
       <p>ROW 포맷은 <b>CDC</b>(Change Data Capture, Debezium 등)의 기반이에요. binlog를 읽어 Kafka로 보내면 DB 변경 이벤트 스트림이 돼요. 분산 시스템 챕터 11장.</p>

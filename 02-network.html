@@ -156,7 +156,7 @@ Authorization: Bearer eyJ...
       <h3>TTL과 전파</h3>
       <p>DNS를 바꿔도 캐시가 만료될 때까지 옛 IP로 가요. 그래서 이전 작업 전에 TTL을 미리 낮춰요(300초 → 60초). "DNS 전파에 48시간"이라는 말은 TTL이 길거나 중간 캐시 서버가 TTL을 무시하는 경우예요.</p>
 
-      <div class="backend"><b>백엔드에서는</b> JVM은 DNS 결과를 자체 캐시해요. 기본은 보안 관리자 없으면 30초지만 옛 버전은 <b>영구 캐시</b>였어요(<code>networkaddress.cache.ttl</code>). 로드밸런서 IP가 바뀌었는데 옛 IP로 계속 가서 장애가 나는 전형적 사고예요. 쿠버네티스 안에서는 CoreDNS가 <code>my-svc.my-ns.svc.cluster.local</code>을 서비스 IP로 풀어주고, <code>ndots:5</code> 설정 때문에 외부 도메인 조회가 5번 실패 후 성공하는 지연 문제가 있어요. DNS 조회 실패나 느림은 "외부 API가 느리다"로 보여서 찾기 어려워요. <code>dig +trace</code>, <code>nslookup</code>으로 직접 확인하세요.</div>
+      <div class="backend"><b>백엔드에서는</b> JVM은 DNS 결과를 자체 캐시해요. 기본은 보안 관리자 없으면 30초지만 옛 버전은 <b>영구 캐시</b>였어요(<code>networkaddress.cache.ttl</code>). 로드밸런서 IP가 바뀌었는데 옛 IP로 계속 가서 장애가 나는 전형적 사고예요. 쿠버네티스 안에서는 CoreDNS가 <code>my-svc.my-ns.svc.cluster.local</code>을 서비스 IP로 풀어주고, <code>ndots:5</code> 설정 때문에 외부 도메인(api.example.com처럼 점이 5개 미만)을 조회하면 클러스터 검색 도메인을 붙인 이름부터 차례로 물어서, 보통 3~4번 실패한 뒤에야 성공하는 지연 문제가 있어요. DNS 조회 실패나 느림은 "외부 API가 느리다"로 보여서 찾기 어려워요. <code>dig +trace</code>, <code>nslookup</code>으로 직접 확인하세요.</div>
 
       <div class="senior"><b>시니어 심화</b> 본문의 JVM DNS 캐시 문제와 짝을 이루는 함정이 있어요. DNS로 트래픽을 옮길 때 실제 전환 시간은 TTL이 아니라 <b>연결의 수명</b>이 정한다는 거예요.
         <h4>상황</h4>
@@ -285,7 +285,7 @@ Authorization: Bearer eyJ...
       <h3>SYN flood</h3>
       <p>SYN만 보내고 ACK를 안 보내면 SYN 큐가 차요. 방어는 <b>SYN cookie</b>: 큐에 저장하지 않고 시퀀스 번호에 정보를 인코딩해서 ACK가 오면 복원해요.</p>
 
-      <div class="backend"><b>백엔드에서는</b> 트래픽 급증 때 "연결은 됐는데 응답이 없다"와 "연결 자체가 안 된다"를 구분해야 해요. 후자는 accept 큐 overflow일 수 있어요. <code>ss -ltn</code>의 Recv-Q(현재 큐)와 Send-Q(backlog 한도), <code>netstat -s | grep -i listen</code>의 overflow 카운트로 확인해요. 톰캣 <code>acceptCount</code>, Nginx <code>backlog</code>, 커널 <code>net.core.somaxconn</code>이 이 크기예요. 셋 중 가장 작은 값이 적용돼요.</div>
+      <div class="backend"><b>백엔드에서는</b> 트래픽 급증 때 "연결은 됐는데 응답이 없다"와 "연결 자체가 안 된다"를 구분해야 해요. 후자는 accept 큐 overflow일 수 있어요. <code>ss -ltn</code>의 Recv-Q(현재 큐)와 Send-Q(backlog 한도), <code>netstat -s | grep -i listen</code>의 overflow 카운트로 확인해요. 애플리케이션이 <code>listen()</code>에 넘기는 값(톰캣 <code>acceptCount</code>, Nginx <code>backlog</code>)과 커널 <code>net.core.somaxconn</code> 중 작은 값이 적용돼요.</div>
 
       <div class="senior"><b>시니어 심화</b> 본문은 accept 큐가 넘치는 상황을 다뤘는데, 이때 클라이언트 쪽에서 보이는 증상에는 아주 특징적인 모양이 있어요. <b>연결 시간이 정확히 1초, 3초, 7초씩 늦어요.</b>
         <h4>상황</h4>
@@ -595,7 +595,7 @@ Authorization: Bearer eyJ...
       <h3>경로는 비대칭일 수 있다</h3>
       <p>가는 길과 오는 길이 다를 수 있어요. BGP는 각 AS가 자기 정책으로 경로를 고르기 때문이에요. 그래서 한쪽 방향만 느린 현상이 생겨요.</p>
 
-      <div class="backend"><b>백엔드에서는</b> 리전 간 호출(서울 ↔ 버지니아)은 RTT 150ms × 왕복 횟수예요. 요청 하나에 DB 왕복이 10번이면 1.5초. 리전 간 동기 호출을 피하고, 데이터를 리전 안에 두고, 꼭 필요하면 왕복 횟수를 줄여야(배치) 해요. 클라우드의 가용 영역(AZ) 간은 1~2ms, 같은 AZ는 0.1ms대예요. 이 차이가 아키텍처를 결정해요.</div>
+      <div class="backend"><b>백엔드에서는</b> 리전 간 호출(서울 ↔ 미국 서부)은 RTT 150ms × 왕복 횟수예요(미국 동부면 RTT가 200ms 가까이 돼요). 요청 하나에 DB 왕복이 10번이면 1.5초. 리전 간 동기 호출을 피하고, 데이터를 리전 안에 두고, 꼭 필요하면 왕복 횟수를 줄여야(배치) 해요. 클라우드의 가용 영역(AZ) 간은 1~2ms, 같은 AZ는 0.1ms대예요. 이 차이가 아키텍처를 결정해요.</div>
 
       <div class="summary"><span class="label">핵심 정리</span>
         <ul><li>인터넷 = AS들의 BGP 연합, 피어링</li><li>RTT는 물리 한계, 줄이려면 거리를 줄이거나 왕복 횟수를 줄이거나</li></ul>

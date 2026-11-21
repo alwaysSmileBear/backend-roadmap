@@ -683,8 +683,8 @@
         <tr><td>고정 윈도우</td><td>1분 단위로 카운트</td><td>단순. 경계에서 2배 허용(59초에 100, 61초에 100)</td></tr>
         <tr><td>슬라이딩 로그</td><td>요청 타임스탬프를 전부 저장, 최근 1분 것만 세기</td><td>정확, 메모리 큼</td></tr>
         <tr><td>슬라이딩 윈도우 카운터</td><td>이전 윈도우 카운트 × 겹친 비율 + 현재 카운트</td><td>근사, 메모리 작음. 실무 표준</td></tr>
-        <tr><td><b>토큰 버킷</b></td><td>초당 r개 토큰 보충, 최대 b개. 요청마다 토큰 1개 소비</td><td>순간 burst(b개) 허용, 평균 r/초. AWS API, Nginx <code>limit_req</code>(burst)</td></tr>
-        <tr><td>리키 버킷</td><td>큐에 넣고 일정 속도로 처리</td><td>출력이 균일. burst 흡수가 아니라 평탄화</td></tr>
+        <tr><td><b>토큰 버킷</b></td><td>초당 r개 토큰 보충, 최대 b개. 요청마다 토큰 1개 소비</td><td>순간 burst(b개) 허용, 평균 r/초. AWS API Gateway, Guava RateLimiter</td></tr>
+        <tr><td>리키 버킷</td><td>큐에 넣고 일정 속도로 처리</td><td>출력이 균일. burst 흡수가 아니라 평탄화. Nginx <code>limit_req</code>(burst는 대기열 크기)</td></tr>
       </table></div>
       <p>토큰 버킷 구현: 마지막 보충 시각과 토큰 수만 저장. 요청 시 <code>tokens = min(b, tokens + (now − last) × r)</code>로 지연 계산. 저장 공간 O(1). 분산 환경이면 Redis에 Lua 스크립트로 원자적 실행.</p>
 
@@ -752,7 +752,7 @@
       <div class="tbl"><table>
         <tr><th>타입</th><th>내부(크기에 따라 전환)</th><th>대표 용도</th></tr>
         <tr><td>String</td><td>SDS(동적 문자열)</td><td>캐시, 카운터(INCR), 분산 락(SET NX PX)</td></tr>
-        <tr><td>List</td><td>quicklist(ziplist 연결)</td><td>큐(LPUSH/BRPOP), 최근 N개</td></tr>
+        <tr><td>List</td><td>quicklist(listpack 연결, 7.0 전엔 ziplist)</td><td>큐(LPUSH/BRPOP), 최근 N개</td></tr>
         <tr><td>Hash</td><td>listpack → 해시 테이블</td><td>객체 필드, 세션</td></tr>
         <tr><td>Set</td><td>intset → 해시 테이블</td><td>태그, 교집합(공통 친구)</td></tr>
         <tr><td>Sorted Set</td><td>listpack → 스킵 리스트 + 해시</td><td>랭킹, 시간순 타임라인, 지연 큐(score=실행 시각)</td></tr>
